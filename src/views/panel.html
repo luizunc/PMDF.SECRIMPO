@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECRIMPO PMDF - REGISTROS</title>
+    <link rel="stylesheet" href="../styles/panel.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-small">
+                    <img src="../../assets/icon.png" alt="Logo PMDF" class="logo-header">
+                </div>
+                <div class="logo-small">
+                    <img src="../../assets/GDF_logo.png" alt="Logo GDF" class="logo-header">
+                </div>
+                <h1>Registro de Ocorrências</h1>
+            </div>
+            <div class="header-right">
+                <span class="user-info" id="userInfo">Usuário conectado</span>
+                <button class="btn-logout" id="logoutBtn">Sair</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <form id="occurrenceForm" class="occurrence-form">
+                
+                <!-- Seção Ocorrência -->
+                <section class="form-section">
+                    <h2 class="section-title">
+                        Dados da Ocorrência
+                    </h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="numeroGenesis">Nº Genesis</label>
+                            <input type="text" id="numeroGenesis" name="numeroGenesis" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="unidade">Unidade</label>
+                            <input type="text" id="unidade" name="unidade" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataApreensao">Data da Apreensão</label>
+                            <input type="date" id="dataApreensao" name="dataApreensao" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="leiInfrigida">Lei Infringida</label>
+                            <input type="text" id="leiInfrigida" name="leiInfrigida" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="artigo">Artigo</label>
+                            <input type="text" id="artigo" name="artigo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="policialCondutor">Policial Condutor</label>
+                            <input type="text" id="policialCondutor" name="policialCondutor" required>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Seção Item Apreendido -->
+                <section class="form-section">
+                    <h2 class="section-title">
+                        Item Apreendido
+                    </h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="especie">Espécie</label>
+                            <input type="text" id="especie" name="especie" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="item">Item</label>
+                            <input type="text" id="item" name="item" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="quantidade">Quantidade</label>
+                            <input type="number" id="quantidade" name="quantidade" min="1" required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="descricaoItem">Descrição</label>
+                            <textarea id="descricaoItem" name="descricaoItem" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="ocorrenciaItem">Ocorrência</label>
+                            <input type="text" id="ocorrenciaItem" name="ocorrenciaItem">
+                        </div>
+                        <div class="form-group">
+                            <label for="proprietarioItem">Proprietário</label>
+                            <input type="text" id="proprietarioItem" name="proprietarioItem">
+                        </div>
+                        <div class="form-group">
+                            <label for="policialItem">Policial</label>
+                            <input type="text" id="policialItem" name="policialItem">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Seção Proprietário -->
+                <section class="form-section">
+                    <h2 class="section-title">
+                        Dados do Proprietário
+                    </h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="nomeProprietario">Nome Completo</label>
+                            <input type="text" id="nomeProprietario" name="nomeProprietario" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataNascimento">Data de Nascimento</label>
+                            <input type="date" id="dataNascimento" name="dataNascimento" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="tipoDocumento">Tipo de Documento</label>
+                            <select id="tipoDocumento" name="tipoDocumento" required>
+                                <option value="">Selecione...</option>
+                                <option value="CPF">CPF</option>
+                                <option value="RG">RG</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="numeroDocumento">Nº CPF ou RG</label>
+                            <input type="text" id="numeroDocumento" name="numeroDocumento" required>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Seção Policial -->
+                <section class="form-section">
+                    <h2 class="section-title">
+                        Dados do Policial
+                    </h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="nomePolicial">Nome Completo</label>
+                            <input type="text" id="nomePolicial" name="nomePolicial" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="matricula">Matrícula</label>
+                            <input type="text" id="matricula" name="matricula" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="graduacao">Graduação</label>
+                            <select id="graduacao" name="graduacao" required>
+                                <option value="">Selecione...</option>
+                                <option value="Soldado">Soldado</option>
+                                <option value="Cabo">Cabo</option>
+                                <option value="Sargento">Sargento</option>
+                                <option value="Subtenente">Subtenente</option>
+                                <option value="Tenente">Tenente</option>
+                                <option value="Capitão">Capitão</option>
+                                <option value="Major">Major</option>
+                                <option value="Tenente-Coronel">Tenente-Coronel</option>
+                                <option value="Coronel">Coronel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="unidadePolicial">Unidade</label>
+                            <input type="text" id="unidadePolicial" name="unidadePolicial" required>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Botões de Ação -->
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="clearBtn">Limpar Formulário</button>
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        <span class="btn-text">Registrar Ocorrência</span>
+                        <span class="btn-loader" style="display: none;">Salvando...</span>
+                    </button>
+                </div>
+
+                <div id="successMessage" class="success-message" style="display: none;"></div>
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+            </form>
+        </main>
+    </div>
+
+    <script src="../scripts/panel.js"></script>
+</body>
+</html>

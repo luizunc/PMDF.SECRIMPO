@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECRIMPO PMDF - LOGIN</title>
+    <link rel="stylesheet" href="../styles/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo-section">
+                <div class="logo-container">
+                    <div class="logo-circle">
+                        <img src="../../assets/icon.png" alt="Logo PMDF" class="logo-image">
+                    </div>
+                    <div class="logo-circle">
+                        <img src="../../assets/GDF_logo.png" alt="Logo GDF" class="logo-image">
+                    </div>
+                </div>
+                <h1>Painel Corporativo</h1>
+                <p class="subtitle">Sistema de Registro de Ocorrências</p>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        placeholder="Digite seu usuário"
+                        required
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="Digite sua senha"
+                        required
+                    >
+                </div>
+
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <span class="btn-text">Entrar</span>
+                    <span class="btn-loader" style="display: none;">Autenticando...</span>
+                </button>
+            </form>
+
+            <div class="footer-info">
+                <p class="version">v1.0</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../scripts/login.js"></script>
+</body>
+</html>
