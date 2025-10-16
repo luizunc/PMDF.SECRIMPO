@@ -23,7 +23,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'views/login.html'));
-  
+
   // Remove o menu completamente
   mainWindow.setMenu(null);
 
@@ -54,13 +54,13 @@ ipcMain.handle('authenticate', async (event, username, password) => {
   return new Promise((resolve, reject) => {
     // Verificar se está em produção (executável) ou desenvolvimento
     const isDev = !app.isPackaged;
-    
+
     let authCommand;
     let authArgs;
-    
+
     // Usar Python em ambos os modos (dev e produção)
     let pythonScript;
-    
+
     if (isDev) {
       // Desenvolvimento: caminho relativo
       pythonScript = path.join(__dirname, '../auth/auth_wrapper.py');
@@ -70,12 +70,12 @@ ipcMain.handle('authenticate', async (event, username, password) => {
       pythonScript = path.join(process.resourcesPath, 'auth/auth_wrapper.py');
       console.log('Modo PRODUÇÃO - Executando Python script:', pythonScript);
     }
-    
+
     authCommand = 'python';
     authArgs = [pythonScript, username, password];
-    
+
     console.log('Username:', username);
-    
+
     const authProcess = spawn(authCommand, authArgs);
 
     let dataString = '';
@@ -95,13 +95,13 @@ ipcMain.handle('authenticate', async (event, username, password) => {
       console.log('Auth exit code:', code);
       console.log('Auth output:', dataString);
       console.log('Auth errors:', errorString);
-      
+
       if (code === 0 && dataString.trim()) {
         try {
           // Extract JSON from output (KeyAuth library prints messages before JSON)
           const lines = dataString.trim().split('\n');
           let jsonString = '';
-          
+
           // Find the line that starts with { (JSON object)
           for (const line of lines) {
             const trimmedLine = line.trim();
@@ -110,24 +110,24 @@ ipcMain.handle('authenticate', async (event, username, password) => {
               break;
             }
           }
-          
+
           if (!jsonString) {
             throw new Error('No JSON found in output');
           }
-          
+
           const result = JSON.parse(jsonString);
           resolve(result);
         } catch (e) {
           console.error('JSON parse error:', e);
-          reject({ 
-            success: false, 
+          reject({
+            success: false,
             message: 'Erro ao processar resposta: ' + dataString.substring(0, 100)
           });
         }
       } else {
         const errorMsg = errorString || dataString || 'Falha na autenticação';
-        reject({ 
-          success: false, 
+        reject({
+          success: false,
           message: errorMsg.substring(0, 200)
         });
       }
@@ -135,8 +135,8 @@ ipcMain.handle('authenticate', async (event, username, password) => {
 
     authProcess.on('error', (error) => {
       console.error('Auth spawn error:', error);
-      reject({ 
-        success: false, 
+      reject({
+        success: false,
         message: 'Erro ao executar autenticação: ' + error.message
       });
     });
@@ -152,13 +152,13 @@ ipcMain.on('load-panel', () => {
 ipcMain.handle('save-occurrence', async (event, data) => {
   try {
     console.log('Dados da ocorrência:', JSON.stringify(data, null, 2));
-    
+
     const fs = require('fs');
     const os = require('os');
-    
+
     // Usar diretório temporário do sistema para evitar conflitos
     const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
-    
+
     // Verificar se existe e é um arquivo (não diretório)
     if (fs.existsSync(dataDir)) {
       const stats = fs.statSync(dataDir);
@@ -167,23 +167,23 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         fs.unlinkSync(dataDir);
       }
     }
-    
+
     // Criar diretório se não existir
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    
+
     const timestamp = new Date().getTime();
-    
+
     // Salvar JSON (backup)
     const jsonFilename = `ocorrencia_${data.ocorrencia.numeroGenesis}_${timestamp}.json`;
     const jsonFilepath = path.join(dataDir, jsonFilename);
     fs.writeFileSync(jsonFilepath, JSON.stringify(data, null, 2));
-    
+
     // Criar arquivo Excel
     const excelFilename = `ocorrencia_${data.ocorrencia.numeroGenesis}_${timestamp}.xlsx`;
     const excelFilepath = path.join(dataDir, excelFilename);
-    
+
     // Preparar dados para a planilha
     const worksheetData = [
       // Cabeçalhos
@@ -239,30 +239,30 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         data.metadata.registradoPor
       ]
     ];
-    
+
     // Criar workbook e worksheet
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    
+
     // Ajustar largura das colunas
     const columnWidths = worksheetData[0].map(() => ({ wch: 20 }));
     worksheet['!cols'] = columnWidths;
-    
+
     // Adicionar worksheet ao workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Ocorrências');
-    
+
     // Salvar arquivo Excel
     XLSX.writeFile(workbook, excelFilepath);
     console.log('✓ Arquivo Excel criado:', excelFilepath);
-    
+
     // Enviar para Google Sheets (se configurado)
     const GOOGLE_SHEETS_URL = process.env.GOOGLE_SHEETS_URL;
-    
+
     if (GOOGLE_SHEETS_URL) {
       try {
         const https = require('https');
         const url = require('url');
-        
+
         // Preparar dados para envio (formato JSON para Google Apps Script)
         const sheetData = {
           timestamp: new Date().toLocaleString('pt-BR'),
@@ -292,10 +292,10 @@ ipcMain.handle('save-occurrence', async (event, data) => {
           excelData: fs.readFileSync(excelFilepath).toString('base64'),
           excelFilename: excelFilename
         };
-        
+
         const postData = JSON.stringify(sheetData);
         const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
-        
+
         const options = {
           hostname: parsedUrl.hostname,
           path: parsedUrl.path,
@@ -305,14 +305,14 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             'Content-Length': Buffer.byteLength(postData)
           }
         };
-        
+
         await new Promise((resolve, reject) => {
           const req = https.request(options, (res) => {
             // Seguir redirecionamentos (302, 301, 307)
             if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
               const redirectUrl = res.headers.location;
               console.log('Seguindo redirecionamento para Google Sheets...');
-              
+
               https.get(redirectUrl, (redirectRes) => {
                 let responseData = '';
                 redirectRes.on('data', (chunk) => { responseData += chunk; });
@@ -324,10 +324,10 @@ ipcMain.handle('save-occurrence', async (event, data) => {
                 console.error('Erro no redirect para Google Sheets:', error);
                 reject(error);
               });
-              
+
               return;
             }
-            
+
             let responseData = '';
             res.on('data', (chunk) => { responseData += chunk; });
             res.on('end', () => {
@@ -335,34 +335,136 @@ ipcMain.handle('save-occurrence', async (event, data) => {
               resolve();
             });
           });
-          
+
           req.on('error', (error) => {
             console.error('Erro ao enviar para Google Sheets:', error);
             reject(error);
           });
-          
+
           req.write(postData);
           req.end();
         });
-        
+
         console.log('✓ Dados e Excel enviados para planilha online');
       } catch (sheetError) {
         console.error('Erro ao enviar para planilha:', sheetError);
         // Continua mesmo se falhar o envio para planilha
       }
     }
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: 'Ocorrência registrada com sucesso! Arquivo Excel gerado.',
       file: excelFilename,
       excelPath: excelFilepath
     };
   } catch (error) {
     console.error('Erro ao salvar ocorrência:', error);
-    return { 
-      success: false, 
-      message: 'Erro ao salvar ocorrência: ' + error.message 
+    return {
+      success: false,
+      message: 'Erro ao salvar ocorrência: ' + error.message
+    };
+  }
+});
+
+// IPC Handler para gerar PNG
+ipcMain.handle('generate-png', async (event, data) => {
+  console.log('Handler generate-png chamado!', data.ocorrencia?.numeroGenesis);
+  
+  try {
+    const puppeteer = require('puppeteer');
+    const fs = require('fs');
+    const os = require('os');
+
+    console.log('Gerando PNG da ocorrência:', data.ocorrencia.numeroGenesis);
+
+    // Ler template HTML
+    const templatePath = path.join(__dirname, 'templates/occurrence-template.html');
+    let htmlTemplate = fs.readFileSync(templatePath, 'utf8');
+
+    // Caminhos das imagens
+    const pmdfLogoPath = path.join(__dirname, '../assets/icon.png');
+    const gdfLogoPath = path.join(__dirname, '../assets/GDF_logo.png');
+
+    // Substituir placeholders com dados reais
+    const replacements = {
+      '{{pmdfLogo}}': `file://${pmdfLogoPath}`,
+      '{{gdfLogo}}': `file://${gdfLogoPath}`,
+      '{{numeroGenesis}}': data.ocorrencia.numeroGenesis || '',
+      '{{dataApreensao}}': data.ocorrencia.dataApreensao ? new Date(data.ocorrencia.dataApreensao).toLocaleDateString('pt-BR') : '',
+      '{{itemApreendido}}': data.itemApreendido.especie || '',
+      '{{nomeItem}}': data.itemApreendido.item || '',
+      '{{quantidade}}': data.itemApreendido.quantidade || '',
+      '{{valor}}': data.itemApreendido.valor || '',
+      '{{peso}}': data.itemApreendido.peso || '',
+      '{{numeroSerie}}': data.itemApreendido.numeroSerie || '',
+      '{{dataGeracao}}': new Date().toLocaleString('pt-BR'),
+      '{{usuarioGeracao}}': data.metadata.registradoPor || ''
+    };
+
+    // Aplicar substituições
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      htmlTemplate = htmlTemplate.replace(new RegExp(placeholder, 'g'), value);
+    }
+
+    // Criar diretório para PNGs
+    const pngDir = path.join(os.tmpdir(), 'secrimpo-pmdf-png');
+    if (!fs.existsSync(pngDir)) {
+      fs.mkdirSync(pngDir, { recursive: true });
+    }
+
+    // Nome do arquivo PNG
+    const timestamp = new Date().getTime();
+    const pngFilename = `etiqueta_${data.ocorrencia.numeroGenesis}_${timestamp}.png`;
+    const pngFilepath = path.join(pngDir, pngFilename);
+
+    // Lançar Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
+
+    // Definir tamanho da página (formato documento)
+    await page.setViewport({
+      width: 800,
+      height: 600,
+      deviceScaleFactor: 2 // Para melhor qualidade
+    });
+
+    // Carregar HTML
+    await page.setContent(htmlTemplate, {
+      waitUntil: 'networkidle0'
+    });
+
+    // Capturar screenshot
+    await page.screenshot({
+      path: pngFilepath,
+      type: 'png',
+      fullPage: true
+    });
+
+    await browser.close();
+
+    console.log('✓ PNG gerado:', pngFilepath);
+
+    // Abrir pasta onde foi salvo o PNG
+    const { shell } = require('electron');
+    shell.showItemInFolder(pngFilepath);
+
+    return {
+      success: true,
+      message: 'Etiqueta gerada com sucesso!',
+      filename: pngFilename,
+      filepath: pngFilepath
+    };
+
+  } catch (error) {
+    console.error('Erro ao gerar PNG:', error);
+    return {
+      success: false,
+      message: 'Erro ao gerar PNG: ' + error.message
     };
   }
 });

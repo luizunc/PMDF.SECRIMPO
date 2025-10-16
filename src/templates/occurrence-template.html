@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiqueta de Item Apreendido - PMDF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            padding: 20px;
+            width: 800px;
+            height: 600px;
+        }
+        
+        .document {
+            border: 2px solid #000;
+            padding: 20px;
+            height: 100%;
+            background: white;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #000;
+        }
+        
+        .logo-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 120px;
+        }
+        
+        .logo-left img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 8px;
+        }
+        
+        .logo-left .text {
+            font-size: 10px;
+            text-align: center;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+        
+        .header-center {
+            flex: 1;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .header-center h1 {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            line-height: 1.2;
+        }
+        
+        .header-center h2 {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .header-center h3 {
+            font-size: 13px;
+            font-weight: bold;
+        }
+        
+        .logo-right {
+            width: 120px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .logo-right img {
+            width: 80px;
+            height: 80px;
+        }
+        
+        .info-section {
+            margin-bottom: 25px;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 0;
+        }
+        
+        .info-field {
+            display: flex;
+            flex: 1;
+        }
+        
+        .field-label {
+            background: #000;
+            color: white;
+            padding: 12px 15px;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .field-value {
+            border: 1px solid #000;
+            border-left: none;
+            padding: 12px 15px;
+            font-size: 13px;
+            background: white;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            min-height: 45px;
+        }
+        
+        .item-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 0;
+            margin-bottom: 20px;
+        }
+        
+        .grid-header {
+            background: #000;
+            color: white;
+            padding: 12px 8px;
+            font-size: 13px;
+            font-weight: bold;
+            text-align: center;
+            border-right: 1px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 45px;
+        }
+        
+        .grid-header:last-child {
+            border-right: none;
+        }
+        
+        .grid-value {
+            border: 1px solid #000;
+            border-top: none;
+            padding: 15px 8px;
+            font-size: 13px;
+            text-align: center;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+        }
+        
+        .footer-info {
+            margin-top: auto;
+            font-size: 10px;
+            text-align: center;
+            color: #666;
+            padding-top: 15px;
+            border-top: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="document">
+        <div class="header">
+            <div class="logo-left">
+                <img src="/assets/icon.png" alt="PMDF Logo">
+                <div class="text">
+                    POLÍCIA MILITAR<br>
+                    DISTRITO FEDERAL
+                </div>
+            </div>
+            
+            <div class="header-center">
+                <h1>GOVERNO DO DISTRITO FEDERAL</h1>
+                <h1>POLÍCIA MILITAR DO DISTRITO FEDERAL</h1>
+                <h2>II COMANDO DE POLICIAMENTO</h2>
+                <h3>REGIONAL OESTE</h3>
+            </div>
+            
+            <div class="logo-right">
+                <img src="/assets/GDF_logo.png" alt="GDF Logo">
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <div class="info-row">
+                <div class="info-field">
+                    <div class="field-label">NÚMERO GÊNESIS</div>
+                    <div class="field-value">{{numeroGenesis}}</div>
+                </div>
+                <div class="info-field">
+                    <div class="field-label">DATA DA APREENSÃO</div>
+                    <div class="field-value">{{dataApreensao}}</div>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-field">
+                    <div class="field-label">ITEM APREENDIDO</div>
+                    <div class="field-value">{{itemApreendido}}</div>
+                </div>
+                <div class="info-field">
+                    <div class="field-label">NOME DO ITEM</div>
+                    <div class="field-value">{{nomeItem}}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="item-grid">
+            <div class="grid-header">QUANTIDADE</div>
+            <div class="grid-header">VALOR</div>
+            <div class="grid-header">PESO</div>
+            <div class="grid-header">N. DE SÉRIE</div>
+            
+            <div class="grid-value">{{quantidade}}</div>
+            <div class="grid-value">{{valor}}</div>
+            <div class="grid-value">{{peso}}</div>
+            <div class="grid-value">{{numeroSerie}}</div>
+        </div>
+        
+        <div class="footer-info">
+            Documento gerado em {{dataGeracao}} por {{usuarioGeracao}}<br>
+            Sistema SECRIMPO PMDF - Registro de Ocorrências
+        </div>
+    </div>
+</body>
+</html>
