@@ -5,8 +5,9 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win --x64"
+    "build": "electron-builder --win --x64",
+    "build:win": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64"
   },
   "keywords": [
     "pmdf",
@@ -16,6 +17,7 @@
   "author": "JCBit",
   "license": "ISC",
   "dependencies": {
+    "chart.js": "^4.4.0",
     "dotenv": "^16.3.1",
     "xlsx": "^0.18.5"
   },
@@ -45,7 +47,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.png",
+      "icon": "assets/App_Logo.ico",
       "publisherName": "JCBit",
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker",
@@ -57,9 +59,9 @@
       "allowElevation": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
+      "installerIcon": "assets/App_Logo.ico",
+      "uninstallerIcon": "assets/App_Logo.ico",
+      "installerHeaderIcon": "assets/App_Logo.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
       "menuCategory": false,
@@ -82,20 +84,17 @@
     },
     "files": [
       "src/**/*",
-      "assets/**/*",
-      ".env"
+      "assets/**/*"
     ],
-    "asarUnpack": [
-      "auth/**/*"
-    ],
+    "asarUnpack": [],
     "extraResources": [
       {
-        "from": "auth",
-        "to": "auth",
-        "filter": [
-          "**/*"
-        ]
+        "from": "auth/dist/auth_keyauth.exe",
+        "to": "auth/auth_keyauth.exe"
       }
-    ]
+    ],
+    "extraMetadata": {
+      "main": "src/main.js"
+    }
   }
 }

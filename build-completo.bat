@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   BUILD COMPLETO - PAINEL PMDF
+echo   BUILD COMPLETO - SECRIMPO PMDF
 echo ========================================
 echo.
 
@@ -51,7 +51,14 @@ if errorlevel 1 (
 echo.
 echo [4/5] Compilando autenticacao Python para EXE...
 cd auth
-pyinstaller --onefile --noconsole --name auth_pmdf --distpath bin --workpath ../build --specpath ../build --add-data "keyauth.py;." --add-data "../.env;." --hidden-import=keyauth auth_wrapper.py
+
+REM Criar pastas se nao existirem
+if not exist "dist" mkdir dist
+if not exist "..\build" mkdir ..\build
+
+REM Compilar com PyInstaller (modo noconsole para producao - sem janelas extras)
+pyinstaller --onefile --noconsole --name auth_keyauth --distpath dist --workpath ..\build --specpath ..\build --add-data "keyauth.py;." --hidden-import=win32security --hidden-import=requests --collect-all pywin32 --collect-all requests auth_wrapper.py
+
 cd ..
 if errorlevel 1 (
     echo [ERRO] Falha ao compilar autenticacao
@@ -59,9 +66,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Verificar se o executavel foi criado
+if not exist "auth\dist\auth_keyauth.exe" (
+    echo [ERRO] auth_keyauth.exe nao foi gerado!
+    pause
+    exit /b 1
+)
+
+echo [OK] auth_keyauth.exe compilado com sucesso!
+for %%A in ("auth\dist\auth_keyauth.exe") do echo     Tamanho: %%~zA bytes
+
 echo.
 echo [5/5] Compilando aplicacao Electron para EXE...
 call npm run build:win
+
 if errorlevel 1 (
     echo [ERRO] Falha ao compilar aplicacao Electron
     pause
@@ -73,9 +91,34 @@ echo ========================================
 echo   BUILD CONCLUIDO COM SUCESSO!
 echo ========================================
 echo.
-echo Instalador criado em: dist\Painel PMDF Setup.exe
+echo Arquivos gerados na pasta 'dist':
+dir dist /b
 echo.
-echo Voce pode distribuir este arquivo para os usuarios.
-echo Eles NAO precisam ter Python ou Node.js instalados!
+echo ========================================
+echo IMPORTANTE - EXECUTAVEL STANDALONE:
+echo ========================================
+echo.
+echo O executavel portable/instalador inclui:
+echo  - Aplicacao Electron completa
+echo  - auth_keyauth.exe (autenticacao KeyAuth)
+echo  - Todas as dependencias necessarias
+echo.
+echo NAO e necessario instalar:
+echo  - Python
+echo  - Node.js
+echo  - Nenhuma dependencia adicional
+echo.
+echo O executavel funciona em qualquer Windows 10/11
+echo sem necessidade de instalacao previa!
+echo.
+echo ========================================
+echo PRONTO PARA DISTRIBUICAO!
+echo ========================================
+echo.
+echo O executavel esta otimizado para producao:
+echo  - Sem janelas de console
+echo  - Autenticacao silenciosa
+echo  - Erros categorizados (Codigo 1-99)
+echo  - Totalmente standalone
 echo.
 pause

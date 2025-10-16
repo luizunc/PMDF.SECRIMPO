@@ -2,7 +2,17 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const XLSX = require('xlsx');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+// .env não é mais necessário - credenciais estão hardcoded no auth_keyauth.exe
+// require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+// Desabilitar aceleração de hardware para evitar erros de GPU
+app.disableHardwareAcceleration();
+
+// Suprimir avisos de GPU no console
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-software-rasterizer');
 
 let mainWindow;
 
@@ -18,7 +28,7 @@ function createWindow() {
     },
     autoHideMenuBar: true,
     backgroundColor: '#071d49',
-    icon: path.join(__dirname, '../assets/icon.png'),
+    icon: path.join(__dirname, '../assets/App_Logo.ico'),
     show: false
   });
 
@@ -58,23 +68,35 @@ ipcMain.handle('authenticate', async (event, username, password) => {
     let authCommand;
     let authArgs;
     
-    // Usar Python em ambos os modos (dev e produção)
-    let pythonScript;
-    
     if (isDev) {
-      // Desenvolvimento: caminho relativo
-      pythonScript = path.join(__dirname, '../auth/auth_wrapper.py');
-      console.log('Modo DEV - Executando Python script:', pythonScript);
+      // Desenvolvimento: usar Python script diretamente
+      const pythonScript = path.join(__dirname, '../auth/auth_wrapper.py');
+      authCommand = 'python';
+      authArgs = [pythonScript, username, password];
     } else {
-      // Produção: caminho em extraResources
-      pythonScript = path.join(process.resourcesPath, 'auth/auth_wrapper.py');
-      console.log('Modo PRODUÇÃO - Executando Python script:', pythonScript);
+      // Produção: usar executável compilado
+      authCommand = path.join(process.resourcesPath, 'auth/auth_keyauth.exe');
+      authArgs = [username, password];
+      
+      // Verificar se o executável existe
+      const fs = require('fs');
+      if (!fs.existsSync(authCommand)) {
+        // Tentar caminho alternativo
+        const alternativePath = path.join(__dirname, '../auth/auth_keyauth.exe');
+        
+        if (fs.existsSync(alternativePath)) {
+          authCommand = alternativePath;
+        } else {
+          resolve({
+            success: false,
+            errorCode: 93,
+            errorType: 'EXECUTABLE_NOT_FOUND',
+            message: 'Erro 93: Sistema de autenticação não encontrado. Reinstale o aplicativo.'
+          });
+          return;
+        }
+      }
     }
-    
-    authCommand = 'python';
-    authArgs = [pythonScript, username, password];
-    
-    console.log('Username:', username);
     
     const authProcess = spawn(authCommand, authArgs);
 
@@ -83,18 +105,13 @@ ipcMain.handle('authenticate', async (event, username, password) => {
 
     authProcess.stdout.on('data', (data) => {
       dataString += data.toString();
-      console.log('Auth stdout:', data.toString());
     });
 
     authProcess.stderr.on('data', (data) => {
       errorString += data.toString();
-      console.error('Auth stderr:', data.toString());
     });
 
     authProcess.on('close', (code) => {
-      console.log('Auth exit code:', code);
-      console.log('Auth output:', dataString);
-      console.log('Auth errors:', errorString);
       
       if (code === 0 && dataString.trim()) {
         try {
@@ -118,24 +135,50 @@ ipcMain.handle('authenticate', async (event, username, password) => {
           const result = JSON.parse(jsonString);
           resolve(result);
         } catch (e) {
-          console.error('JSON parse error:', e);
-          reject({ 
-            success: false, 
-            message: 'Erro ao processar resposta: ' + dataString.substring(0, 100)
+          resolve({ 
+            success: false,
+            errorCode: 92,
+            errorType: 'PARSE_ERROR',
+            message: 'Erro 92: Falha ao processar resposta do servidor'
           });
         }
       } else {
-        const errorMsg = errorString || dataString || 'Falha na autenticação';
-        reject({ 
-          success: false, 
-          message: errorMsg.substring(0, 200)
+        // Tentar extrair JSON de erro do Python (stdout ou stderr)
+        try {
+          const outputToCheck = dataString.trim() || errorString.trim();
+          const lines = outputToCheck.split('\n');
+          let jsonString = '';
+          
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('{')) {
+              jsonString = trimmedLine;
+              break;
+            }
+          }
+          
+          if (jsonString) {
+            const errorResult = JSON.parse(jsonString);
+            resolve(errorResult);
+            return;
+          }
+        } catch (e) {
+          // Silencioso em produção
+        }
+        
+        // Se não conseguiu extrair JSON, retornar erro genérico
+        resolve({ 
+          success: false,
+          errorCode: 95,
+          errorType: 'AUTH_ERROR',
+          message: 'Erro 95: Falha na autenticação. Verifique suas credenciais.'
         });
       }
     });
 
     authProcess.on('error', (error) => {
       console.error('Auth spawn error:', error);
-      reject({ 
+      resolve({ 
         success: false, 
         message: 'Erro ao executar autenticação: ' + error.message
       });
@@ -188,7 +231,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     const worksheetData = [
       // Cabeçalhos
       [
-        'Timestamp',
+        'Log Registro',
         'Nº Genesis',
         'Unidade',
         'Data Apreensão',
@@ -198,18 +241,20 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         'Espécie',
         'Item',
         'Quantidade',
-        'Descrição Item',
+        'Unidade de Medida',
+        'Descrição',
         'Ocorrência Item',
         'Proprietário Item',
         'Policial Item',
-        'Nome Proprietário',
-        'Data Nascimento',
-        'Tipo Documento',
-        'Nº Documento',
         'Nome Policial',
+        'Nome Completo',
+        'Data Nascimento',
+        'Documento',
+        'Nº Documento',
+        'Nome Completo',
         'Matrícula',
         'Graduação',
-        'Unidade Policial',
+        'Unidade',
         'Registrado Por'
       ],
       // Dados
@@ -224,6 +269,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         data.itemApreendido.especie,
         data.itemApreendido.item,
         data.itemApreendido.quantidade,
+        data.itemApreendido.unidadeMedida || '',
         data.itemApreendido.descricao,
         data.itemApreendido.ocorrencia || '',
         data.itemApreendido.proprietario || '',
@@ -256,41 +302,43 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     console.log('✓ Arquivo Excel criado:', excelFilepath);
     
     // Enviar para Google Sheets (se configurado)
-    const GOOGLE_SHEETS_URL = process.env.GOOGLE_SHEETS_URL;
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec"; // Cole sua URL do Google Apps Script aqui
     
     if (GOOGLE_SHEETS_URL) {
       try {
         const https = require('https');
         const url = require('url');
         
-        // Preparar dados para envio (formato JSON para Google Apps Script)
+        // Preparar dados para envio (formato array para Google Apps Script)
+        // Envia apenas a linha de dados (sem cabeçalhos, pois já existem na planilha)
         const sheetData = {
-          timestamp: new Date().toLocaleString('pt-BR'),
-          numeroGenesis: data.ocorrencia.numeroGenesis,
-          unidade: data.ocorrencia.unidade,
-          dataApreensao: data.ocorrencia.dataApreensao,
-          leiInfrigida: data.ocorrencia.leiInfrigida,
-          artigo: data.ocorrencia.artigo,
-          policialCondutor: data.ocorrencia.policialCondutor,
-          especie: data.itemApreendido.especie,
-          item: data.itemApreendido.item,
-          quantidade: data.itemApreendido.quantidade,
-          descricaoItem: data.itemApreendido.descricao,
-          ocorrenciaItem: data.itemApreendido.ocorrencia || '',
-          proprietarioItem: data.itemApreendido.proprietario || '',
-          policialItem: data.itemApreendido.policial || '',
-          nomeProprietario: data.proprietario.nome,
-          dataNascimento: data.proprietario.dataNascimento,
-          tipoDocumento: data.proprietario.tipoDocumento,
-          numeroDocumento: data.proprietario.numeroDocumento,
-          nomePolicial: data.policial.nome,
-          matricula: data.policial.matricula,
-          graduacao: data.policial.graduacao,
-          unidadePolicial: data.policial.unidade,
-          registradoPor: data.metadata.registradoPor,
-          // Incluir dados do Excel em base64 para envio
-          excelData: fs.readFileSync(excelFilepath).toString('base64'),
-          excelFilename: excelFilename
+          values: [
+            new Date().toLocaleString('pt-BR'),
+            data.ocorrencia.numeroGenesis,
+            data.ocorrencia.unidade,
+            data.ocorrencia.dataApreensao,
+            data.ocorrencia.leiInfrigida,
+            data.ocorrencia.artigo,
+            data.ocorrencia.policialCondutor,
+            data.itemApreendido.especie,
+            data.itemApreendido.item,
+            data.itemApreendido.quantidade,
+            data.itemApreendido.unidadeMedida || '',
+            data.itemApreendido.descricao,
+            data.itemApreendido.ocorrencia || '',
+            data.itemApreendido.proprietario || '',
+            data.itemApreendido.policial || '',
+            data.policial.nome,
+            data.proprietario.nome,
+            data.proprietario.dataNascimento,
+            data.proprietario.tipoDocumento,
+            data.proprietario.numeroDocumento,
+            data.policial.nome,
+            data.policial.matricula,
+            data.policial.graduacao,
+            data.policial.unidade,
+            data.metadata.registradoPor
+          ]
         };
         
         const postData = JSON.stringify(sheetData);
@@ -370,4 +418,371 @@ ipcMain.handle('save-occurrence', async (event, data) => {
 // IPC Handler para logout
 ipcMain.on('logout', () => {
   mainWindow.loadFile(path.join(__dirname, 'views/login.html'));
+});
+
+// IPC Handler para carregar dashboard
+ipcMain.on('load-dashboard', () => {
+  mainWindow.loadFile(path.join(__dirname, 'views/dashboard.html'));
+});
+
+// IPC Handler para obter todas as ocorrências do Google Sheets
+ipcMain.handle('get-occurrences', async (event) => {
+  try {
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    
+    if (!GOOGLE_SHEETS_URL) {
+      console.log('Google Sheets URL não configurada, retornando dados locais');
+      return { success: true, data: [] };
+    }
+    
+    const https = require('https');
+    const url = require('url');
+    
+    return new Promise((resolve, reject) => {
+      const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
+      
+      const options = {
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.path,
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      https.get(GOOGLE_SHEETS_URL, (res) => {
+        // Seguir redirecionamentos
+        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
+          const redirectUrl = res.headers.location;
+          https.get(redirectUrl, (redirectRes) => {
+            let responseData = '';
+            redirectRes.on('data', (chunk) => { responseData += chunk; });
+            redirectRes.on('end', () => {
+              try {
+                const data = JSON.parse(responseData);
+                resolve({ success: true, data: data.occurrences || [] });
+              } catch (err) {
+                console.error('Erro ao parsear resposta:', err);
+                resolve({ success: true, data: [] });
+              }
+            });
+          }).on('error', (error) => {
+            console.error('Erro no redirect:', error);
+            resolve({ success: true, data: [] });
+          });
+          return;
+        }
+        
+        let responseData = '';
+        res.on('data', (chunk) => { responseData += chunk; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(responseData);
+            resolve({ success: true, data: data.occurrences || [] });
+          } catch (err) {
+            console.error('Erro ao parsear resposta:', err);
+            resolve({ success: true, data: [] });
+          }
+        });
+      }).on('error', (error) => {
+        console.error('Erro ao carregar do Google Sheets:', error);
+        resolve({ success: true, data: [] });
+      });
+    });
+  } catch (error) {
+    console.error('Erro ao obter ocorrências:', error);
+    return { success: false, message: error.message, data: [] };
+  }
+});
+
+// IPC Handler para atualizar ocorrência (APENAS Google Sheets)
+ipcMain.handle('update-occurrence', async (event, data) => {
+  try {
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    
+    if (!GOOGLE_SHEETS_URL) {
+      return { success: false, message: 'Google Sheets URL não configurada' };
+    }
+    
+    const https = require('https');
+    const url = require('url');
+    
+    const updateData = {
+      action: 'update',
+      timestamp: new Date().toLocaleString('pt-BR'),
+      numeroGenesis: data.ocorrencia.numeroGenesis,
+      unidade: data.ocorrencia.unidade,
+      dataApreensao: data.ocorrencia.dataApreensao,
+      leiInfrigida: data.ocorrencia.leiInfrigida,
+      artigo: data.ocorrencia.artigo,
+      policialCondutor: data.ocorrencia.policialCondutor,
+      especie: data.itemApreendido.especie,
+      item: data.itemApreendido.item,
+      quantidade: data.itemApreendido.quantidade,
+      unidadeMedida: data.itemApreendido.unidadeMedida || '',
+      descricaoItem: data.itemApreendido.descricao,
+      ocorrenciaItem: data.itemApreendido.ocorrencia || '',
+      proprietarioItem: data.itemApreendido.proprietario || '',
+      policialItem: data.itemApreendido.policial || '',
+      nomePolicial: data.policial.nome,
+      nomeProprietario: data.proprietario.nome,
+      dataNascimento: data.proprietario.dataNascimento,
+      tipoDocumento: data.proprietario.tipoDocumento,
+      numeroDocumento: data.proprietario.numeroDocumento,
+      matricula: data.policial.matricula,
+      graduacao: data.policial.graduacao,
+      unidadePolicial: data.policial.unidade,
+      registradoPor: data.metadata.registradoPor
+    };
+    
+    const postData = JSON.stringify(updateData);
+    const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
+    
+    const options = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+    
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        // Seguir redirecionamentos
+        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
+          const redirectUrl = res.headers.location;
+          console.log('Seguindo redirecionamento para atualizar no Google Sheets...');
+          
+          https.get(redirectUrl, (redirectRes) => {
+            let responseData = '';
+            redirectRes.on('data', (chunk) => { responseData += chunk; });
+            redirectRes.on('end', () => {
+              console.log('✓ Ocorrência atualizada no Google Sheets:', responseData);
+              resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
+            });
+          }).on('error', (error) => {
+            console.error('Erro no redirect para Google Sheets:', error);
+            reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
+          });
+          
+          return;
+        }
+        
+        let responseData = '';
+        res.on('data', (chunk) => { responseData += chunk; });
+        res.on('end', () => {
+          console.log('✓ Ocorrência atualizada no Google Sheets:', responseData);
+          resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('Erro ao atualizar no Google Sheets:', error);
+        reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
+      });
+      
+      req.write(postData);
+      req.end();
+    });
+    
+  } catch (error) {
+    console.error('Erro ao atualizar ocorrência:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC Handler para excluir ocorrência (APENAS Google Sheets)
+ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
+  try {
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    
+    if (!GOOGLE_SHEETS_URL) {
+      return { success: false, message: 'Google Sheets URL não configurada' };
+    }
+    
+    if (!numeroGenesis) {
+      return { success: false, message: 'Número Genesis não fornecido' };
+    }
+    
+    const https = require('https');
+    const url = require('url');
+    
+    const deleteData = {
+      action: 'delete',
+      numeroGenesis: numeroGenesis
+    };
+    
+    const postData = JSON.stringify(deleteData);
+    const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
+    
+    const options = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.path,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+    
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        // Seguir redirecionamentos
+        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
+          const redirectUrl = res.headers.location;
+          console.log('Seguindo redirecionamento para deletar no Google Sheets...');
+          
+          https.get(redirectUrl, (redirectRes) => {
+            let responseData = '';
+            redirectRes.on('data', (chunk) => { responseData += chunk; });
+            redirectRes.on('end', () => {
+              console.log('✓ Ocorrência deletada do Google Sheets:', responseData);
+              resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
+            });
+          }).on('error', (error) => {
+            console.error('Erro no redirect para Google Sheets:', error);
+            reject({ success: false, message: 'Erro ao excluir: ' + error.message });
+          });
+          
+          return;
+        }
+        
+        let responseData = '';
+        res.on('data', (chunk) => { responseData += chunk; });
+        res.on('end', () => {
+          console.log('✓ Ocorrência deletada do Google Sheets:', responseData);
+          resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('Erro ao deletar no Google Sheets:', error);
+        reject({ success: false, message: 'Erro ao excluir: ' + error.message });
+      });
+      
+      req.write(postData);
+      req.end();
+    });
+    
+  } catch (error) {
+    console.error('Erro ao excluir ocorrência:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC Handler para exportar todas as ocorrências para Excel
+ipcMain.handle('export-occurrences', async (event) => {
+  try {
+    const fs = require('fs');
+    const os = require('os');
+    
+    const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
+    
+    if (!fs.existsSync(dataDir)) {
+      return { success: false, message: 'Nenhuma ocorrência encontrada' };
+    }
+    
+    const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
+    
+    if (files.length === 0) {
+      return { success: false, message: 'Nenhuma ocorrência encontrada' };
+    }
+    
+    // Preparar dados para exportação
+    const worksheetData = [
+      [
+        'Log Registro',
+        'Nº Genesis',
+        'Unidade',
+        'Data Apreensão',
+        'Lei Infringida',
+        'Artigo',
+        'Policial Condutor',
+        'Espécie',
+        'Item',
+        'Quantidade',
+        'Unidade de Medida',
+        'Descrição Item',
+        'Ocorrência Item',
+        'Proprietário Item',
+        'Policial Item',
+        'Nome Proprietário',
+        'Data Nascimento',
+        'Tipo Documento',
+        'Nº Documento',
+        'Nome Policial',
+        'Matrícula',
+        'Graduação',
+        'Unidade Policial',
+        'Registrado Por',
+        'Data Registro'
+      ]
+    ];
+    
+    files.forEach(file => {
+      try {
+        const filePath = path.join(dataDir, file);
+        const content = fs.readFileSync(filePath, 'utf8');
+        const data = JSON.parse(content);
+        
+        worksheetData.push([
+          new Date(data.metadata.dataRegistro).toLocaleString('pt-BR'),
+          data.ocorrencia.numeroGenesis,
+          data.ocorrencia.unidade,
+          data.ocorrencia.dataApreensao,
+          data.ocorrencia.leiInfrigida,
+          data.ocorrencia.artigo,
+          data.ocorrencia.policialCondutor,
+          data.itemApreendido.especie,
+          data.itemApreendido.item,
+          data.itemApreendido.quantidade,
+          data.itemApreendido.unidadeMedida || '',
+          data.itemApreendido.descricao || '',
+          data.itemApreendido.ocorrencia || '',
+          data.itemApreendido.proprietario || '',
+          data.itemApreendido.policial || '',
+          data.proprietario.nome,
+          data.proprietario.dataNascimento,
+          data.proprietario.tipoDocumento,
+          data.proprietario.numeroDocumento,
+          data.policial.nome,
+          data.policial.matricula,
+          data.policial.graduacao,
+          data.policial.unidade,
+          data.metadata.registradoPor,
+          new Date(data.metadata.dataRegistro).toLocaleString('pt-BR')
+        ]);
+      } catch (err) {
+        console.error('Erro ao processar arquivo:', file, err);
+      }
+    });
+    
+    // Criar workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    
+    // Ajustar largura das colunas
+    const columnWidths = worksheetData[0].map(() => ({ wch: 20 }));
+    worksheet['!cols'] = columnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Todas Ocorrências');
+    
+    // Salvar arquivo
+    const timestamp = new Date().getTime();
+    const exportFilename = `todas_ocorrencias_${timestamp}.xlsx`;
+    const exportPath = path.join(dataDir, exportFilename);
+    
+    XLSX.writeFile(workbook, exportPath);
+    
+    return { 
+      success: true, 
+      message: 'Exportação concluída com sucesso',
+      filePath: exportPath
+    };
+  } catch (error) {
+    console.error('Erro ao exportar ocorrências:', error);
+    return { success: false, message: error.message };
+  }
 });

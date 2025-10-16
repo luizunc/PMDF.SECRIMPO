@@ -25,22 +25,26 @@ loginForm.addEventListener('submit', async (e) => {
         // Chamar autenticação via Python/KeyAuth
         const result = await ipcRenderer.invoke('authenticate', username, password);
         
-        if (result.success) {
+        if (result && result.success) {
             // Salvar informações do usuário (se necessário)
             sessionStorage.setItem('username', username);
             if (result.userData) {
                 sessionStorage.setItem('userData', JSON.stringify(result.userData));
             }
             
-            // Carregar painel principal
-            ipcRenderer.send('load-panel');
+            // Carregar dashboard diretamente
+            ipcRenderer.send('load-dashboard');
         } else {
-            showError(result.message || 'Falha na autenticação. Verifique suas credenciais.');
+            // Exibir mensagem de erro categorizada
+            const errorMessage = result?.message || 'Falha na autenticação. Verifique suas credenciais.';
+            showError(errorMessage);
             setLoading(false);
         }
     } catch (error) {
         console.error('Erro na autenticação:', error);
-        showError(error.message || 'Erro ao conectar com o servidor de autenticação.');
+        // Se o erro for um objeto, tentar extrair a mensagem
+        const errorMessage = error?.message || error?.toString() || 'Erro ao conectar com o servidor de autenticação.';
+        showError(errorMessage);
         setLoading(false);
     }
 });

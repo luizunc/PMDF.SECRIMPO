@@ -7,29 +7,52 @@ const logoutBtn = document.getElementById('logoutBtn');
 const successMessage = document.getElementById('successMessage');
 const errorMessage = document.getElementById('errorMessage');
 const userInfo = document.getElementById('userInfo');
+const userMenuBtn = document.getElementById('userMenuBtn');
+const userDropdown = document.getElementById('userDropdown');
+
+// Navigation tabs
+const tabDashboard = document.getElementById('tabDashboard');
+const tabNovaOcorrencia = document.getElementById('tabNovaOcorrencia');
 
 // Carregar informações do usuário
 window.addEventListener('load', () => {
     const username = sessionStorage.getItem('username');
     if (username) {
-        userInfo.textContent = `Usuário: ${username}`;
+        userInfo.textContent = `${username}`;
     }
     
-    // Definir data atual como padrão
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('dataApreensao').value = today;
+    // Definir data atual como padrão no formato brasileiro
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    document.getElementById('dataApreensao').value = `${day}/${month}/${year}`;
 });
 
 // Submit do formulário
 occurrenceForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    // Validar datas antes de enviar
+    const dataApreensao = document.getElementById('dataApreensao').value;
+    const dataNascimento = document.getElementById('dataNascimento').value;
+    
+    if (!isValidDate(dataApreensao)) {
+        showError('Data de apreensão inválida. Use o formato dd/mm/aaaa');
+        return;
+    }
+    
+    if (!isValidDate(dataNascimento)) {
+        showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
+        return;
+    }
+    
     // Coletar dados do formulário
     const formData = {
         ocorrencia: {
             numeroGenesis: document.getElementById('numeroGenesis').value,
             unidade: document.getElementById('unidade').value,
-            dataApreensao: document.getElementById('dataApreensao').value,
+            dataApreensao: brDateToISO(dataApreensao),
             leiInfrigida: document.getElementById('leiInfrigida').value,
             artigo: document.getElementById('artigo').value,
             policialCondutor: document.getElementById('policialCondutor').value
@@ -38,6 +61,7 @@ occurrenceForm.addEventListener('submit', async (e) => {
             especie: document.getElementById('especie').value,
             item: document.getElementById('item').value,
             quantidade: document.getElementById('quantidade').value,
+            unidadeMedida: document.getElementById('unidadeMedida').value,
             descricao: document.getElementById('descricaoItem').value,
             ocorrencia: document.getElementById('ocorrenciaItem').value,
             proprietario: document.getElementById('proprietarioItem').value,
@@ -45,7 +69,7 @@ occurrenceForm.addEventListener('submit', async (e) => {
         },
         proprietario: {
             nome: document.getElementById('nomeProprietario').value,
-            dataNascimento: document.getElementById('dataNascimento').value,
+            dataNascimento: brDateToISO(dataNascimento),
             tipoDocumento: document.getElementById('tipoDocumento').value,
             numeroDocumento: document.getElementById('numeroDocumento').value
         },
@@ -89,6 +113,19 @@ occurrenceForm.addEventListener('submit', async (e) => {
 clearBtn.addEventListener('click', () => {
     if (confirm('Deseja realmente limpar todos os campos do formulário?')) {
         clearForm();
+    }
+});
+
+// Toggle do menu do usuário
+userMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userDropdown.classList.toggle('active');
+});
+
+// Fechar menu ao clicar fora
+document.addEventListener('click', (e) => {
+    if (!userDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
+        userDropdown.classList.remove('active');
     }
 });
 
@@ -136,31 +173,159 @@ function clearForm() {
     occurrenceForm.reset();
     hideMessages();
     
-    // Redefinir data atual
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('dataApreensao').value = today;
+    // Redefinir data atual no formato brasileiro
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    document.getElementById('dataApreensao').value = `${day}/${month}/${year}`;
     
     // Focar no primeiro campo
     document.getElementById('numeroGenesis').focus();
 }
 
-// Máscaras para campos
-document.getElementById('numeroDocumento').addEventListener('input', function(e) {
-    const tipo = document.getElementById('tipoDocumento').value;
+// Máscara para data no formato brasileiro (dd/mm/aaaa)
+function applyDateMask(e) {
     let value = e.target.value.replace(/\D/g, '');
     
-    if (tipo === 'CPF' && value.length <= 11) {
-        value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    } else if (tipo === 'RG' && value.length <= 9) {
-        value = value.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+    if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (value.length >= 5) {
+        value = value.substring(0, 5) + '/' + value.substring(5, 9);
     }
     
     e.target.value = value;
-});
+}
 
-// Validação de quantidade
-document.getElementById('quantidade').addEventListener('input', function(e) {
-    if (e.target.value < 1) {
-        e.target.value = 1;
+// Validar data no formato brasileiro
+function isValidDate(dateString) {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = dateString.match(regex);
+    
+    if (!match) return false;
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const year = parseInt(match[3], 10);
+    
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && 
+           date.getMonth() === month - 1 && 
+           date.getDate() === day;
+}
+
+// Converter data brasileira para ISO (yyyy-mm-dd)
+function brDateToISO(brDate) {
+    const [day, month, year] = brDate.split('/');
+    return `${year}-${month}-${day}`;
+}
+
+// Aplicar máscaras nos campos de data
+document.getElementById('dataApreensao').addEventListener('input', applyDateMask);
+document.getElementById('dataNascimento').addEventListener('input', applyDateMask);
+
+// Validação ao sair do campo de data
+document.getElementById('dataApreensao').addEventListener('blur', function(e) {
+    if (e.target.value && !isValidDate(e.target.value)) {
+        showError('Data de apreensão inválida. Use o formato dd/mm/aaaa');
+        e.target.focus();
+    } else {
+        hideMessages();
     }
 });
+
+document.getElementById('dataNascimento').addEventListener('blur', function(e) {
+    if (e.target.value && !isValidDate(e.target.value)) {
+        showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
+        e.target.focus();
+    } else {
+        hideMessages();
+    }
+});
+
+// Função para formatar CPF: 000.000.000-00
+function formatCPF(value) {
+    value = value.replace(/\D/g, '');
+    if (value.length > 11) value = value.substring(0, 11);
+    
+    if (value.length <= 3) {
+        return value;
+    } else if (value.length <= 6) {
+        return value.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+    } else if (value.length <= 9) {
+        return value.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+    } else {
+        return value.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+    }
+}
+
+// Função para formatar RG: 0.000.000 (7 dígitos) ou 00.000.000-0 (9 dígitos)
+function formatRG(value) {
+    value = value.replace(/\D/g, '');
+    if (value.length > 9) value = value.substring(0, 9);
+    
+    // Formato com 7 dígitos: 0.000.000
+    if (value.length <= 7) {
+        if (value.length <= 1) {
+            return value;
+        } else if (value.length <= 4) {
+            return value.replace(/(\d{1})(\d{1,3})/, '$1.$2');
+        } else {
+            return value.replace(/(\d{1})(\d{3})(\d{1,3})/, '$1.$2.$3');
+        }
+    }
+    // Formato com 8-9 dígitos: 00.000.000-0
+    else {
+        if (value.length <= 2) {
+            return value;
+        } else if (value.length <= 5) {
+            return value.replace(/(\d{2})(\d{1,3})/, '$1.$2');
+        } else if (value.length <= 8) {
+            return value.replace(/(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
+        } else {
+            return value.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+        }
+    }
+}
+
+// Aplicar máscara no campo de documento
+document.getElementById('numeroDocumento').addEventListener('input', function(e) {
+    const tipo = document.getElementById('tipoDocumento').value;
+    let value = e.target.value;
+    
+    if (tipo === 'CPF') {
+        e.target.value = formatCPF(value);
+    } else if (tipo === 'RG') {
+        e.target.value = formatRG(value);
+    }
+});
+
+// Limpar e reaplicar máscara quando mudar o tipo de documento
+document.getElementById('tipoDocumento').addEventListener('change', function(e) {
+    const numeroDocumento = document.getElementById('numeroDocumento');
+    const value = numeroDocumento.value.replace(/\D/g, '');
+    
+    if (e.target.value === 'CPF') {
+        numeroDocumento.value = formatCPF(value);
+        numeroDocumento.placeholder = '000.000.000-00';
+        numeroDocumento.maxLength = 14;
+    } else if (e.target.value === 'RG') {
+        numeroDocumento.value = formatRG(value);
+        numeroDocumento.placeholder = '0.000.000 ou 00.000.000-0';
+        numeroDocumento.maxLength = 12;
+    } else {
+        numeroDocumento.value = value;
+        numeroDocumento.placeholder = '';
+        numeroDocumento.removeAttribute('maxLength');
+    }
+});
+
+// Navigation tab events
+tabDashboard.addEventListener('click', () => {
+    ipcRenderer.send('load-dashboard');
+});
+

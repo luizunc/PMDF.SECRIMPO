@@ -12,18 +12,63 @@
         <header class="app-header">
             <div class="header-left">
                 <div class="logo-small">
-                    <img src="../../assets/icon.png" alt="Logo PMDF" class="logo-header">
-                </div>
-                <div class="logo-small">
-                    <img src="../../assets/GDF_logo.png" alt="Logo GDF" class="logo-header">
+                    <img src="../../assets/PMDF_LetraBranca_Panel.png" alt="Logo PMDF" class="logo-header">
                 </div>
                 <h1>Registro de Ocorrências</h1>
             </div>
             <div class="header-right">
-                <span class="user-info" id="userInfo">Usuário conectado</span>
-                <button class="btn-logout" id="logoutBtn">Sair</button>
+                <div class="logo-small">
+                    <img src="../../assets/GDF_logo.jpg" alt="Logo GDF" class="logo-header">
+                </div>
+                <div class="user-menu-container">
+                    <button class="user-menu-button" id="userMenuBtn">
+                        <svg class="user-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
+                            <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="dropdown-header">
+                            <svg class="dropdown-user-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
+                            </svg>
+                            <span class="user-info" id="userInfo">Usuário conectado</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="logoutBtn">
+                            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            <span>Sair</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="nav-tab" id="tabDashboard">
+                <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                </svg>
+                Controle de Ocorrências
+            </button>
+            <button class="nav-tab active" id="tabNovaOcorrencia">
+                <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Nova Ocorrência
+            </button>
+        </nav>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -45,7 +90,7 @@
                         </div>
                         <div class="form-group">
                             <label for="dataApreensao">Data da Apreensão</label>
-                            <input type="date" id="dataApreensao" name="dataApreensao" required>
+                            <input type="text" id="dataApreensao" name="dataApreensao" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="leiInfrigida">Lei Infringida</label>
@@ -76,9 +121,21 @@
                             <label for="item">Item</label>
                             <input type="text" id="item" name="item" required>
                         </div>
-                        <div class="form-group">
-                            <label for="quantidade">Quantidade</label>
-                            <input type="number" id="quantidade" name="quantidade" min="1" required>
+                        <div class="form-group-inline">
+                            <div class="form-group form-group-small">
+                                <label for="quantidade">Quantidade</label>
+                                <input type="text" id="quantidade" name="quantidade" required>
+                            </div>
+                            <div class="form-group form-group-small">
+                                <label for="unidadeMedida">Unidade</label>
+                                <select id="unidadeMedida" name="unidadeMedida" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="mg">Mg (Miligrama)</option>
+                                    <option value="g">G (Grama)</option>
+                                    <option value="kg">Kg (Quilograma)</option>
+                                    <option value="t">T (Tonelada)</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-group full-width">
                             <label for="descricaoItem">Descrição</label>
@@ -111,7 +168,7 @@
                         </div>
                         <div class="form-group">
                             <label for="dataNascimento">Data de Nascimento</label>
-                            <input type="date" id="dataNascimento" name="dataNascimento" required>
+                            <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="tipoDocumento">Tipo de Documento</label>
@@ -122,7 +179,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="numeroDocumento">Nº CPF ou RG</label>
+                            <label for="numeroDocumento">Nº Documento</label>
                             <input type="text" id="numeroDocumento" name="numeroDocumento" required>
                         </div>
                     </div>
@@ -146,11 +203,16 @@
                             <label for="graduacao">Graduação</label>
                             <select id="graduacao" name="graduacao" required>
                                 <option value="">Selecione...</option>
-                                <option value="Soldado">Soldado</option>
+                                <option value="Soldado de 2ª Classe">Soldado 2ª Classe</option>
+                                <option value="Soldado de 1ª Classe">Soldado 1ª Classe</option>
                                 <option value="Cabo">Cabo</option>
-                                <option value="Sargento">Sargento</option>
+                                <option value="3º Sargento">3º Sargento</option>
+                                <option value="2º Sargento">2º Sargento</option>
+                                <option value="1º Sargento">1º Sargento</option>
                                 <option value="Subtenente">Subtenente</option>
-                                <option value="Tenente">Tenente</option>
+                                <option value="Aspirante-a-Oficial">Aspirante-a-Oficial</option>
+                                <option value="Segundo-Tenente">Segundo-Tenente</option>
+                                <option value="Primeiro-Tenente">Primeiro-Tenente</option>
                                 <option value="Capitão">Capitão</option>
                                 <option value="Major">Major</option>
                                 <option value="Tenente-Coronel">Tenente-Coronel</option>
