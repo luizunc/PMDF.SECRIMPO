@@ -43,6 +43,12 @@ const deleteOccurrenceId = document.getElementById('deleteOccurrenceId');
 const btnCancelDelete = document.getElementById('btnCancelDelete');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
+const printModal = document.getElementById('printModal');
+const printModalClose = document.getElementById('printModalClose');
+const printOccurrenceId = document.getElementById('printOccurrenceId');
+const btnCancelPrint = document.getElementById('btnCancelPrint');
+const btnPrintTermoApreensao = document.getElementById('btnPrintTermoApreensao');
+
 // State
 let allOccurrences = [];
 let filteredOccurrences = [];
@@ -90,6 +96,7 @@ function updateStats() {
     // Count this month
     const now = new Date();
     const thisMonth = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate.getMonth() === now.getMonth() && 
                occDate.getFullYear() === now.getFullYear();
@@ -98,6 +105,7 @@ function updateStats() {
 
     // Count today
     const today = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate.toDateString() === now.toDateString();
     }).length;
@@ -120,10 +128,10 @@ function renderTable() {
     filteredOccurrences.forEach((occ, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td><strong>${occ.ocorrencia.numeroGenesis}</strong></td>
-            <td>${formatDate(occ.ocorrencia.dataApreensao)}</td>
-            <td>${occ.ocorrencia.unidade}</td>
-            <td>${occ.proprietario.nome}</td>
+            <td><strong>${occ.ocorrencia?.numeroGenesis || 'N/A'}</strong></td>
+            <td>${occ.ocorrencia?.dataApreensao ? formatDate(occ.ocorrencia.dataApreensao) : 'N/A'}</td>
+            <td>${occ.ocorrencia?.unidade || 'N/A'}</td>
+            <td>${occ.proprietario?.nome || 'N/A'}</td>
             <td>
                 <div class="action-buttons">
                     <button class="btn-action btn-view" onclick="viewOccurrence(${index})" title="Ver detalhes">
@@ -136,6 +144,13 @@ function renderTable() {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-action btn-print" onclick="openPrintModal(${index})" title="Imprimir">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 6 2 18 2 18 9"/>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                            <rect x="6" y="14" width="12" height="8"/>
                         </svg>
                     </button>
                     <button class="btn-action btn-delete-action" onclick="confirmDelete(${index})" title="Excluir">
@@ -182,7 +197,16 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Unidade</label>
-                    <input type="text" id="edit-unidade" value="${currentOccurrence.ocorrencia.unidade}" ${!editable ? 'disabled' : ''}>
+                    ${editable ? `
+                    <select id="edit-unidade" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione...</option>
+                        <option value="8º BPM" ${currentOccurrence.ocorrencia.unidade === '8º BPM' ? 'selected' : ''}>8º BPM</option>
+                        <option value="10º BPM" ${currentOccurrence.ocorrencia.unidade === '10º BPM' ? 'selected' : ''}>10º BPM</option>
+                        <option value="16º BPM" ${currentOccurrence.ocorrencia.unidade === '16º BPM' ? 'selected' : ''}>16º BPM</option>
+                    </select>
+                    ` : `
+                    <input type="text" id="edit-unidade" value="${currentOccurrence.ocorrencia.unidade}" disabled>
+                    `}
                 </div>
                 <div class="modal-form-group">
                     <label>Data da Apreensão</label>
@@ -374,6 +398,36 @@ async function deleteOccurrence() {
     }
 }
 
+// Open print modal
+window.openPrintModal = function(index) {
+    currentOccurrence = filteredOccurrences[index];
+    printOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
+    printModal.classList.add('active');
+};
+
+// Close print modal
+function closePrintModal() {
+    printModal.classList.remove('active');
+}
+
+// Print Termo de Apreensão
+async function printTermoApreensao() {
+    if (!currentOccurrence) return;
+
+    try {
+        // Fechar modal imediatamente
+        closePrintModal();
+        
+        // Gerar e exibir prévia do documento
+        const result = await ipcRenderer.invoke('print-termo-apreensao', currentOccurrence);
+        if (!result.success) {
+            alert('Erro ao gerar documento: ' + result.message);
+        }
+    } catch (error) {
+        alert('Erro ao gerar documento: ' + error.message);
+    }
+}
+
 // Export to Excel
 async function exportToExcel() {
     try {
@@ -390,17 +444,38 @@ async function exportToExcel() {
 
 // Search
 searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
+    const query = e.target.value.toLowerCase().trim();
     
     if (!query) {
         filteredOccurrences = [...allOccurrences];
     } else {
         filteredOccurrences = allOccurrences.filter(occ => {
-            return occ.ocorrencia.numeroGenesis.toLowerCase().includes(query) ||
-                   occ.ocorrencia.unidade.toLowerCase().includes(query) ||
-                   occ.proprietario.nome.toLowerCase().includes(query) ||
-                   occ.policial.nome.toLowerCase().includes(query) ||
-                   occ.itemApreendido.item.toLowerCase().includes(query);
+            try {
+                // Tentar diferentes possíveis estruturas de dados
+                let numeroGenesis = '';
+                
+                if (occ.ocorrencia?.numeroGenesis) {
+                    numeroGenesis = occ.ocorrencia.numeroGenesis;
+                }
+                else if (occ.numeroGenesis) {
+                    numeroGenesis = occ.numeroGenesis;
+                }
+                else if (occ['Nº Genesis']) {
+                    numeroGenesis = occ['Nº Genesis'];
+                }
+                else if (occ['numeroGenesis']) {
+                    numeroGenesis = occ['numeroGenesis'];
+                }
+                else if (occ['numero_genesis']) {
+                    numeroGenesis = occ['numero_genesis'];
+                }
+                
+                const numeroGenesisLower = (numeroGenesis || '').toString().toLowerCase();
+                return numeroGenesisLower.includes(query);
+            } catch (error) {
+                console.error('Erro ao filtrar ocorrência:', error, occ);
+                return false;
+            }
         });
     }
     
@@ -474,6 +549,10 @@ btnCancelDelete.addEventListener('click', () => {
 });
 btnConfirmDelete.addEventListener('click', deleteOccurrence);
 
+printModalClose.addEventListener('click', closePrintModal);
+btnCancelPrint.addEventListener('click', closePrintModal);
+btnPrintTermoApreensao.addEventListener('click', printTermoApreensao);
+
 // Refresh button
 refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
@@ -511,6 +590,12 @@ viewModal.addEventListener('click', (e) => {
 deleteModal.addEventListener('click', (e) => {
     if (e.target === deleteModal) {
         deleteModal.classList.remove('active');
+    }
+});
+
+printModal.addEventListener('click', (e) => {
+    if (e.target === printModal) {
+        closePrintModal();
     }
 });
 
@@ -577,6 +662,7 @@ function createLineChart() {
         last30Days.push(dateStr);
         
         const count = allOccurrences.filter(occ => {
+            if (!occ.metadata?.dataRegistro) return false;
             const occDate = new Date(occ.metadata.dataRegistro);
             return occDate.toDateString() === date.toDateString();
         }).length;
@@ -656,7 +742,7 @@ function createBarChart() {
     // Count by unit
     const unitCounts = {};
     allOccurrences.forEach(occ => {
-        const unit = occ.ocorrencia.unidade;
+        const unit = occ.ocorrencia?.unidade || 'Não especificado';
         unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
     
@@ -737,7 +823,7 @@ function createDoughnutChart() {
     // Count by item type
     const itemCounts = {};
     allOccurrences.forEach(occ => {
-        const item = occ.itemApreendido.item;
+        const item = occ.itemApreendido?.item || 'Não especificado';
         itemCounts[item] = (itemCounts[item] || 0) + 1;
     });
     

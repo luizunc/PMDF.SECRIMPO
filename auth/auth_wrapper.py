@@ -11,19 +11,10 @@ from pathlib import Path
 # Configurar stdout para modo unbuffered (importante para executáveis PyInstaller)
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
-# ============================================
-# CONFIGURAÇÕES KEYAUTH - HARDCODED
-# ============================================
-# IMPORTANTE: Substitua os valores abaixo com suas credenciais reais do KeyAuth
-# Acesse: https://keyauth.cc/app/ para obter suas credenciais
-
-KEYAUTH_NAME = "SECRIMPO"           # Nome da sua aplicação no KeyAuth
-KEYAUTH_OWNERID = "iqvgrWhiYz"        # Seu Owner ID (10 caracteres)
-KEYAUTH_VERSION = "1.0"                       # Versão da aplicação
-
-# ============================================
-# NÃO MODIFIQUE ABAIXO DESTA LINHA
-# ============================================
+# Configurações KeyAuth
+KEYAUTH_NAME = "SECRIMPO"
+KEYAUTH_OWNERID = "iqvgrWhiYz"
+KEYAUTH_VERSION = "1.0"
 
 # Importar KeyAuth oficial
 try:
@@ -72,13 +63,13 @@ def categorize_error(error_msg):
         },
         {
             "code": 2,
-            "patterns": ["username doesn't exist", "user doesn't exist"],
+            "patterns": ["username doesn't exist", "user doesn't exist", "username does not exist", "invalid username", "user not found"],
             "type": "USER_NOT_FOUND",
             "message": "Erro 2: Usuário não encontrado no sistema"
         },
         {
             "code": 3,
-            "patterns": ["incorrect password", "wrong password"],
+            "patterns": ["incorrect password", "wrong password", "password doesn't match", "password does not match", "invalid password"],
             "type": "INVALID_PASSWORD",
             "message": "Erro 3: Senha incorreta"
         },
@@ -149,11 +140,31 @@ def categorize_error(error_msg):
                     "original": error_msg
                 }
     
-    # Erro genérico se não encontrar padrão específico
+    # Erro genérico se não encontrar padrão específico - traduzir mensagem para português
+    # Verificar se contém palavras-chave comuns e traduzir
+    if "username" in error_msg_lower or "user" in error_msg_lower:
+        friendly_msg = "Usuário inválido ou não encontrado"
+    elif "password" in error_msg_lower or "pass" in error_msg_lower:
+        friendly_msg = "Senha inválida"
+    elif "hwid" in error_msg_lower:
+        friendly_msg = "Erro de autenticação de dispositivo"
+    elif "subscription" in error_msg_lower:
+        friendly_msg = "Erro relacionado à assinatura"
+    elif "banned" in error_msg_lower or "ban" in error_msg_lower:
+        friendly_msg = "Usuário bloqueado"
+    elif "version" in error_msg_lower:
+        friendly_msg = "Versão da aplicação inválida"
+    elif "timeout" in error_msg_lower or "timed out" in error_msg_lower:
+        friendly_msg = "Tempo de conexão esgotado"
+    elif "connection" in error_msg_lower or "network" in error_msg_lower:
+        friendly_msg = "Erro de conexão"
+    else:
+        friendly_msg = "Falha na autenticação. Verifique suas credenciais"
+    
     return {
         "code": 99,
         "type": "AUTHENTICATION_ERROR",
-        "message": f"Erro 99: Falha na autenticação - {error_msg}",
+        "message": f"Erro 99: {friendly_msg}",
         "original": error_msg
     }
 
@@ -325,12 +336,15 @@ def main():
         
     except Exception as e:
         # Capturar qualquer erro não tratado
+        error_msg = str(e)
+        error_info = categorize_error(error_msg)
+        
         error_result = {
             "success": False,
             "errorCode": 94,
             "errorType": "CRITICAL_ERROR",
-            "message": f"Erro 94: Erro crítico no sistema - {str(e)}",
-            "originalError": str(e)
+            "message": f"Erro 94: Erro crítico no sistema - {error_info['message'].replace('Erro 99: ', '')}",
+            "originalError": error_msg
         }
         sys.stdout.write(json.dumps(error_result) + '\n')
         sys.stdout.flush()

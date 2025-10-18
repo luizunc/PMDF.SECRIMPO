@@ -786,3 +786,164 @@ ipcMain.handle('export-occurrences', async (event) => {
     return { success: false, message: error.message };
   }
 });
+
+// IPC Handler para gerar e visualizar Termo de Apreensão
+ipcMain.handle('print-termo-apreensao', async (event, occurrenceData) => {
+  try {
+    const fs = require('fs');
+    const os = require('os');
+    
+    // Criar janela temporária para gerar o PDF
+    const tempWindow = new BrowserWindow({
+      width: 800,
+      height: 1000,
+      show: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+
+    // Carregar o template do termo de apreensão
+    const templatePath = path.join(__dirname, 'templates/termo_apreensao.html');
+    await tempWindow.loadFile(templatePath);
+
+    // Injetar os dados da ocorrência no template
+    await tempWindow.webContents.executeJavaScript(`
+      window.occurrenceData = ${JSON.stringify(occurrenceData)};
+      if (typeof populateForm === 'function') {
+        populateForm(window.occurrenceData);
+      }
+    `);
+
+    // Aguardar para garantir que os dados foram preenchidos
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Gerar PDF
+    const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    const pdfFilename = `termo_apreensao_${occurrenceData.ocorrencia.numeroGenesis}_${Date.now()}.pdf`;
+    const pdfPath = path.join(dataDir, pdfFilename);
+
+    const pdfData = await tempWindow.webContents.printToPDF({
+      printBackground: true,
+      margins: {
+        marginType: 'none'
+      },
+      pageSize: 'A4',
+      landscape: false,
+      preferCSSPageSize: true
+    });
+
+    fs.writeFileSync(pdfPath, pdfData);
+    console.log('PDF gerado:', pdfPath);
+
+    // Fechar janela temporária
+    tempWindow.close();
+
+    // Criar janela de prévia do PDF
+    const previewWindow = new BrowserWindow({
+      width: 900,
+      height: 1000,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        plugins: true
+      },
+      autoHideMenuBar: true,
+      title: 'Termo de Apreensão - Prévia'
+    });
+
+    // Remover menu
+    previewWindow.setMenu(null);
+
+    // Carregar PDF diretamente
+    console.log('Carregando PDF na janela:', pdfPath);
+    await previewWindow.loadFile(pdfPath);
+
+    // Adicionar botões de ação via JavaScript injetado
+    await previewWindow.webContents.executeJavaScript(`
+      // Criar toolbar com botões
+      const toolbar = document.createElement('div');
+      toolbar.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #071d49 0%, #0a2d6e 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 10000; font-family: system-ui, -apple-system, sans-serif;';
+      
+      const title = document.createElement('div');
+      title.textContent = 'Termo de Apreensão';
+      title.style.cssText = 'font-size: 16px; font-weight: normal;';
+      
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display: flex; gap: 10px;';
+      
+      const btnPrint = document.createElement('button');
+      btnPrint.textContent = 'Imprimir';
+      btnPrint.style.cssText = 'padding: 10px 20px; background: linear-gradient(135deg, #279b4d 0%, #1f8040 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: normal; cursor: pointer; font-family: inherit;';
+      btnPrint.onclick = () => window.print();
+      
+      const btnClose = document.createElement('button');
+      btnClose.textContent = 'Fechar';
+      btnClose.style.cssText = 'padding: 10px 20px; background: #e0e0e0; color: #333; border: none; border-radius: 8px; font-size: 14px; font-weight: normal; cursor: pointer; font-family: inherit;';
+      btnClose.onclick = () => window.close();
+      
+      actions.appendChild(btnPrint);
+      actions.appendChild(btnClose);
+      toolbar.appendChild(title);
+      toolbar.appendChild(actions);
+      document.body.insertBefore(toolbar, document.body.firstChild);
+      
+      // Ajustar margem do corpo para não sobrepor a toolbar
+      document.body.style.marginTop = '60px';
+    `);
+
+    previewWindow.show();
+
+    return { success: true, message: 'Prévia do documento gerada', pdfPath: pdfPath };
+  } catch (error) {
+    console.error('Erro ao gerar termo de apreensão:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC Handler para imprimir PDF
+ipcMain.handle('print-pdf', async (event, pdfPath) => {
+  try {
+    const fs = require('fs');
+    
+    if (!fs.existsSync(pdfPath)) {
+      return { success: false, message: 'Arquivo PDF não encontrado' };
+    }
+
+    // Criar janela para impressão
+    const printWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+
+    // Carregar o PDF
+    await printWindow.loadFile(pdfPath);
+
+    // Aguardar carregamento
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Abrir diálogo de impressão
+    printWindow.webContents.print({
+      silent: false,
+      printBackground: true
+    }, (success, errorType) => {
+      if (!success) {
+        console.error('Erro ao imprimir:', errorType);
+      }
+      printWindow.close();
+    });
+
+    return { success: true, message: 'Documento enviado para impressão' };
+  } catch (error) {
+    console.error('Erro ao imprimir PDF:', error);
+    return { success: false, message: error.message };
+  }
+});
