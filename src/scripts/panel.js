@@ -9,6 +9,9 @@ const errorMessage = document.getElementById('errorMessage');
 const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const loadingSubtext = document.getElementById('loadingSubtext');
 
 // Navigation tabs
 const tabDashboard = document.getElementById('tabDashboard');
@@ -85,35 +88,41 @@ occurrenceForm.addEventListener('submit', async (e) => {
         }
     };
     
-    // Desabilitar botão e mostrar loading
-    setLoading(true);
+    // Mostrar loading global
+    showLoading('Salvando ocorrência', 'Enviando dados para o sistema...');
     hideMessages();
     
     try {
         const result = await ipcRenderer.invoke('save-occurrence', formData);
         
         if (result.success) {
+            hideLoading();
             showSuccess(result.message);
             // Limpar formulário após sucesso
             setTimeout(() => {
                 clearForm();
             }, 2000);
         } else {
+            hideLoading();
             showError(result.message || 'Erro ao salvar ocorrência');
         }
     } catch (error) {
         console.error('Erro ao salvar:', error);
+        hideLoading();
         showError('Erro ao salvar ocorrência: ' + error.message);
-    } finally {
-        setLoading(false);
     }
 });
 
 // Limpar formulário
 clearBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente limpar todos os campos do formulário?')) {
-        clearForm();
-    }
+    customAlert.confirm(
+        'Deseja realmente limpar todos os campos do formulário?',
+        () => {
+            clearForm();
+        },
+        null,
+        'Limpar Formulário'
+    );
 });
 
 // Toggle do menu do usuário
@@ -131,25 +140,26 @@ document.addEventListener('click', (e) => {
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-        sessionStorage.clear();
-        ipcRenderer.send('logout');
-    }
+    customAlert.confirm(
+        'Deseja realmente sair do sistema?',
+        () => {
+            sessionStorage.clear();
+            ipcRenderer.send('logout');
+        }
+    );
 });
 
 // Funções auxiliares
-function setLoading(loading) {
-    submitBtn.disabled = loading;
-    const btnText = submitBtn.querySelector('.btn-text');
-    const btnLoader = submitBtn.querySelector('.btn-loader');
-    
-    if (loading) {
-        btnText.style.display = 'none';
-        btnLoader.style.display = 'inline-block';
-    } else {
-        btnText.style.display = 'inline-block';
-        btnLoader.style.display = 'none';
-    }
+function showLoading(text = 'Processando', subtext = 'Aguarde um momento') {
+    loadingText.textContent = text;
+    loadingSubtext.textContent = subtext;
+    loadingOverlay.classList.add('active');
+    submitBtn.disabled = true;
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('active');
+    submitBtn.disabled = false;
 }
 
 function showSuccess(message) {
@@ -172,6 +182,7 @@ function hideMessages() {
 function clearForm() {
     occurrenceForm.reset();
     hideMessages();
+    hideLoading();
     
     // Redefinir data atual no formato brasileiro
     const today = new Date();

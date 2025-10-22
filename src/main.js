@@ -191,6 +191,13 @@ ipcMain.on('load-panel', () => {
   mainWindow.loadFile(path.join(__dirname, 'views/panel.html'));
 });
 
+// Função auxiliar para converter data ISO para formato brasileiro
+function isoToBrDate(isoDate) {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-');
+  return `${day}/${month}/${year}`;
+}
+
 // IPC Handler para salvar ocorrência
 ipcMain.handle('save-occurrence', async (event, data) => {
   try {
@@ -227,9 +234,9 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     const excelFilename = `ocorrencia_${data.ocorrencia.numeroGenesis}_${timestamp}.xlsx`;
     const excelFilepath = path.join(dataDir, excelFilename);
     
-    // Preparar dados para a planilha
+    // Preparar dados para a planilha (ordem do formulário)
     const worksheetData = [
-      // Cabeçalhos
+      // Cabeçalhos (24 colunas)
       [
         'Log Registro',
         'Nº Genesis',
@@ -246,23 +253,22 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         'Ocorrência Item',
         'Proprietário Item',
         'Policial Item',
-        'Nome Policial',
-        'Nome Completo',
+        'Nome Proprietário',
         'Data Nascimento',
-        'Documento',
+        'Tipo Documento',
         'Nº Documento',
-        'Nome Completo',
+        'Nome Policial',
         'Matrícula',
         'Graduação',
-        'Unidade',
+        'Unidade Policial',
         'Registrado Por'
       ],
-      // Dados
+      // Dados (ordem do formulário)
       [
         new Date().toLocaleString('pt-BR'),
         data.ocorrencia.numeroGenesis,
         data.ocorrencia.unidade,
-        data.ocorrencia.dataApreensao,
+        isoToBrDate(data.ocorrencia.dataApreensao),
         data.ocorrencia.leiInfrigida,
         data.ocorrencia.artigo,
         data.ocorrencia.policialCondutor,
@@ -275,7 +281,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
         data.itemApreendido.proprietario || '',
         data.itemApreendido.policial || '',
         data.proprietario.nome,
-        data.proprietario.dataNascimento,
+        isoToBrDate(data.proprietario.dataNascimento),
         data.proprietario.tipoDocumento,
         data.proprietario.numeroDocumento,
         data.policial.nome,
@@ -302,7 +308,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     console.log('✓ Arquivo Excel criado:', excelFilepath);
     
     // Enviar para Google Sheets (se configurado)
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec"; // Cole sua URL do Google Apps Script aqui
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec"; // Cole sua URL do Google Apps Script aqui
     
     if (GOOGLE_SHEETS_URL) {
       try {
@@ -316,7 +322,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             new Date().toLocaleString('pt-BR'),
             data.ocorrencia.numeroGenesis,
             data.ocorrencia.unidade,
-            data.ocorrencia.dataApreensao,
+            isoToBrDate(data.ocorrencia.dataApreensao),
             data.ocorrencia.leiInfrigida,
             data.ocorrencia.artigo,
             data.ocorrencia.policialCondutor,
@@ -328,9 +334,8 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             data.itemApreendido.ocorrencia || '',
             data.itemApreendido.proprietario || '',
             data.itemApreendido.policial || '',
-            data.policial.nome,
             data.proprietario.nome,
-            data.proprietario.dataNascimento,
+            isoToBrDate(data.proprietario.dataNascimento),
             data.proprietario.tipoDocumento,
             data.proprietario.numeroDocumento,
             data.policial.nome,
@@ -428,7 +433,7 @@ ipcMain.on('load-dashboard', () => {
 // IPC Handler para obter todas as ocorrências do Google Sheets
 ipcMain.handle('get-occurrences', async (event) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       console.log('Google Sheets URL não configurada, retornando dados locais');
@@ -438,56 +443,52 @@ ipcMain.handle('get-occurrences', async (event) => {
     const https = require('https');
     const url = require('url');
     
-    return new Promise((resolve, reject) => {
-      const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
-      
-      const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.path,
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      };
-      
-      https.get(GOOGLE_SHEETS_URL, (res) => {
-        // Seguir redirecionamentos
-        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
-          const redirectUrl = res.headers.location;
-          https.get(redirectUrl, (redirectRes) => {
-            let responseData = '';
-            redirectRes.on('data', (chunk) => { responseData += chunk; });
-            redirectRes.on('end', () => {
-              try {
-                const data = JSON.parse(responseData);
-                resolve({ success: true, data: data.occurrences || [] });
-              } catch (err) {
-                console.error('Erro ao parsear resposta:', err);
-                resolve({ success: true, data: [] });
-              }
-            });
-          }).on('error', (error) => {
-            console.error('Erro no redirect:', error);
-            resolve({ success: true, data: [] });
-          });
+    // Função recursiva para seguir redirecionamentos
+    const followRedirects = (targetUrl, maxRedirects = 5) => {
+      return new Promise((resolve, reject) => {
+        if (maxRedirects === 0) {
+          reject(new Error('Muitos redirecionamentos'));
           return;
         }
         
-        let responseData = '';
-        res.on('data', (chunk) => { responseData += chunk; });
-        res.on('end', () => {
+        https.get(targetUrl, (res) => {
+          // Seguir redirecionamentos
+          if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
+            const redirectUrl = res.headers.location;
+            console.log(`Redirecionando para: ${redirectUrl}`);
+            followRedirects(redirectUrl, maxRedirects - 1).then(resolve).catch(reject);
+            return;
+          }
+          
+          let responseData = '';
+          res.on('data', (chunk) => { responseData += chunk; });
+          res.on('end', () => {
+            resolve(responseData);
+          });
+        }).on('error', (error) => {
+          reject(error);
+        });
+      });
+    };
+    
+    return new Promise((resolve, reject) => {
+      followRedirects(GOOGLE_SHEETS_URL)
+        .then(responseData => {
           try {
+            console.log('Resposta do Google Sheets (primeiros 500 caracteres):', responseData.substring(0, 500));
             const data = JSON.parse(responseData);
+            console.log('Dados parseados com sucesso. Total de ocorrências:', data.occurrences?.length || 0);
             resolve({ success: true, data: data.occurrences || [] });
           } catch (err) {
             console.error('Erro ao parsear resposta:', err);
+            console.error('Resposta recebida:', responseData.substring(0, 200));
             resolve({ success: true, data: [] });
           }
+        })
+        .catch(error => {
+          console.error('Erro ao carregar do Google Sheets:', error);
+          resolve({ success: true, data: [] });
         });
-      }).on('error', (error) => {
-        console.error('Erro ao carregar do Google Sheets:', error);
-        resolve({ success: true, data: [] });
-      });
     });
   } catch (error) {
     console.error('Erro ao obter ocorrências:', error);
@@ -498,7 +499,7 @@ ipcMain.handle('get-occurrences', async (event) => {
 // IPC Handler para atualizar ocorrência (APENAS Google Sheets)
 ipcMain.handle('update-occurrence', async (event, data) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
@@ -512,7 +513,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
       timestamp: new Date().toLocaleString('pt-BR'),
       numeroGenesis: data.ocorrencia.numeroGenesis,
       unidade: data.ocorrencia.unidade,
-      dataApreensao: data.ocorrencia.dataApreensao,
+      dataApreensao: isoToBrDate(data.ocorrencia.dataApreensao),
       leiInfrigida: data.ocorrencia.leiInfrigida,
       artigo: data.ocorrencia.artigo,
       policialCondutor: data.ocorrencia.policialCondutor,
@@ -524,67 +525,96 @@ ipcMain.handle('update-occurrence', async (event, data) => {
       ocorrenciaItem: data.itemApreendido.ocorrencia || '',
       proprietarioItem: data.itemApreendido.proprietario || '',
       policialItem: data.itemApreendido.policial || '',
-      nomePolicial: data.policial.nome,
       nomeProprietario: data.proprietario.nome,
-      dataNascimento: data.proprietario.dataNascimento,
+      dataNascimento: isoToBrDate(data.proprietario.dataNascimento),
       tipoDocumento: data.proprietario.tipoDocumento,
       numeroDocumento: data.proprietario.numeroDocumento,
+      nomePolicial: data.policial.nome,
       matricula: data.policial.matricula,
       graduacao: data.policial.graduacao,
       unidadePolicial: data.policial.unidade,
       registradoPor: data.metadata.registradoPor
     };
     
+    console.log('Enviando atualização para Google Sheets:', updateData);
+    
     const postData = JSON.stringify(updateData);
-    const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
     
-    const options = {
-      hostname: parsedUrl.hostname,
-      path: parsedUrl.path,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-    
-    return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
-        // Seguir redirecionamentos
-        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
-          const redirectUrl = res.headers.location;
-          console.log('Seguindo redirecionamento para atualizar no Google Sheets...');
-          
-          https.get(redirectUrl, (redirectRes) => {
-            let responseData = '';
-            redirectRes.on('data', (chunk) => { responseData += chunk; });
-            redirectRes.on('end', () => {
-              console.log('✓ Ocorrência atualizada no Google Sheets:', responseData);
-              resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
-            });
-          }).on('error', (error) => {
-            console.error('Erro no redirect para Google Sheets:', error);
-            reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
-          });
-          
+    // Função recursiva para seguir redirecionamentos em POST
+    const postWithRedirects = (targetUrl, payload, maxRedirects = 5) => {
+      return new Promise((resolve, reject) => {
+        if (maxRedirects === 0) {
+          reject(new Error('Muitos redirecionamentos'));
           return;
         }
         
-        let responseData = '';
-        res.on('data', (chunk) => { responseData += chunk; });
-        res.on('end', () => {
-          console.log('✓ Ocorrência atualizada no Google Sheets:', responseData);
-          resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
+        const parsedUrl = url.parse(targetUrl);
+        const options = {
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.path,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        };
+        
+        const req = https.request(options, (res) => {
+          // Seguir redirecionamentos
+          if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
+            const redirectUrl = res.headers.location;
+            console.log(`Redirecionando POST para: ${redirectUrl}`);
+            
+            // Para redirecionamentos 307 e 308, manter POST
+            // Para 301 e 302, usar GET
+            if (res.statusCode === 307 || res.statusCode === 308) {
+              postWithRedirects(redirectUrl, payload, maxRedirects - 1).then(resolve).catch(reject);
+            } else {
+              // Converter para GET
+              https.get(redirectUrl, (getRes) => {
+                let responseData = '';
+                getRes.on('data', (chunk) => { responseData += chunk; });
+                getRes.on('end', () => {
+                  resolve(responseData);
+                });
+              }).on('error', reject);
+            }
+            return;
+          }
+          
+          let responseData = '';
+          res.on('data', (chunk) => { responseData += chunk; });
+          res.on('end', () => {
+            resolve(responseData);
+          });
         });
+        
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
       });
-      
-      req.on('error', (error) => {
-        console.error('Erro ao atualizar no Google Sheets:', error);
-        reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
-      });
-      
-      req.write(postData);
-      req.end();
+    };
+    
+    return new Promise((resolve, reject) => {
+      postWithRedirects(GOOGLE_SHEETS_URL, postData)
+        .then(responseData => {
+          console.log('✓ Resposta do Google Sheets:', responseData);
+          try {
+            const result = JSON.parse(responseData);
+            if (result.success) {
+              resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
+            } else {
+              resolve({ success: false, message: result.message || 'Erro ao atualizar' });
+            }
+          } catch (err) {
+            // Se não for JSON, considerar sucesso se não houver erro
+            resolve({ success: true, message: 'Ocorrência atualizada com sucesso' });
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao atualizar no Google Sheets:', error);
+          reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
+        });
     });
     
   } catch (error) {
@@ -596,7 +626,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
 // IPC Handler para excluir ocorrência (APENAS Google Sheets)
 ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxARGfB0PYy4ldli1GTzFnwTLn8P9Je9UTVvbiAcVOeVeqgfnEixcJIFEgmPnau-aMs/exec";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
@@ -614,56 +644,85 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
       numeroGenesis: numeroGenesis
     };
     
+    console.log('Enviando exclusão para Google Sheets:', deleteData);
+    
     const postData = JSON.stringify(deleteData);
-    const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
     
-    const options = {
-      hostname: parsedUrl.hostname,
-      path: parsedUrl.path,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-    
-    return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
-        // Seguir redirecionamentos
-        if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
-          const redirectUrl = res.headers.location;
-          console.log('Seguindo redirecionamento para deletar no Google Sheets...');
-          
-          https.get(redirectUrl, (redirectRes) => {
-            let responseData = '';
-            redirectRes.on('data', (chunk) => { responseData += chunk; });
-            redirectRes.on('end', () => {
-              console.log('✓ Ocorrência deletada do Google Sheets:', responseData);
-              resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
-            });
-          }).on('error', (error) => {
-            console.error('Erro no redirect para Google Sheets:', error);
-            reject({ success: false, message: 'Erro ao excluir: ' + error.message });
-          });
-          
+    // Função recursiva para seguir redirecionamentos em POST
+    const postWithRedirects = (targetUrl, payload, maxRedirects = 5) => {
+      return new Promise((resolve, reject) => {
+        if (maxRedirects === 0) {
+          reject(new Error('Muitos redirecionamentos'));
           return;
         }
         
-        let responseData = '';
-        res.on('data', (chunk) => { responseData += chunk; });
-        res.on('end', () => {
-          console.log('✓ Ocorrência deletada do Google Sheets:', responseData);
-          resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
+        const parsedUrl = url.parse(targetUrl);
+        const options = {
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.path,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        };
+        
+        const req = https.request(options, (res) => {
+          // Seguir redirecionamentos
+          if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
+            const redirectUrl = res.headers.location;
+            console.log(`Redirecionando DELETE para: ${redirectUrl}`);
+            
+            // Para redirecionamentos 307 e 308, manter POST
+            // Para 301 e 302, usar GET
+            if (res.statusCode === 307 || res.statusCode === 308) {
+              postWithRedirects(redirectUrl, payload, maxRedirects - 1).then(resolve).catch(reject);
+            } else {
+              // Converter para GET
+              https.get(redirectUrl, (getRes) => {
+                let responseData = '';
+                getRes.on('data', (chunk) => { responseData += chunk; });
+                getRes.on('end', () => {
+                  resolve(responseData);
+                });
+              }).on('error', reject);
+            }
+            return;
+          }
+          
+          let responseData = '';
+          res.on('data', (chunk) => { responseData += chunk; });
+          res.on('end', () => {
+            resolve(responseData);
+          });
         });
+        
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
       });
-      
-      req.on('error', (error) => {
-        console.error('Erro ao deletar no Google Sheets:', error);
-        reject({ success: false, message: 'Erro ao excluir: ' + error.message });
-      });
-      
-      req.write(postData);
-      req.end();
+    };
+    
+    return new Promise((resolve, reject) => {
+      postWithRedirects(GOOGLE_SHEETS_URL, postData)
+        .then(responseData => {
+          console.log('✓ Resposta do Google Sheets (delete):', responseData);
+          try {
+            const result = JSON.parse(responseData);
+            if (result.success) {
+              resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
+            } else {
+              resolve({ success: false, message: result.message || 'Erro ao excluir' });
+            }
+          } catch (err) {
+            // Se não for JSON, considerar sucesso se não houver erro
+            resolve({ success: true, message: 'Ocorrência excluída com sucesso' });
+          }
+        })
+        .catch(error => {
+          console.error('Erro ao deletar no Google Sheets:', error);
+          reject({ success: false, message: 'Erro ao excluir: ' + error.message });
+        });
     });
     
   } catch (error) {
@@ -690,7 +749,7 @@ ipcMain.handle('export-occurrences', async (event) => {
       return { success: false, message: 'Nenhuma ocorrência encontrada' };
     }
     
-    // Preparar dados para exportação
+    // Preparar dados para exportação (ordem do formulário)
     const worksheetData = [
       [
         'Log Registro',
@@ -704,7 +763,7 @@ ipcMain.handle('export-occurrences', async (event) => {
         'Item',
         'Quantidade',
         'Unidade de Medida',
-        'Descrição Item',
+        'Descrição',
         'Ocorrência Item',
         'Proprietário Item',
         'Policial Item',
@@ -716,8 +775,7 @@ ipcMain.handle('export-occurrences', async (event) => {
         'Matrícula',
         'Graduação',
         'Unidade Policial',
-        'Registrado Por',
-        'Data Registro'
+        'Registrado Por'
       ]
     ];
     
@@ -731,7 +789,7 @@ ipcMain.handle('export-occurrences', async (event) => {
           new Date(data.metadata.dataRegistro).toLocaleString('pt-BR'),
           data.ocorrencia.numeroGenesis,
           data.ocorrencia.unidade,
-          data.ocorrencia.dataApreensao,
+          isoToBrDate(data.ocorrencia.dataApreensao),
           data.ocorrencia.leiInfrigida,
           data.ocorrencia.artigo,
           data.ocorrencia.policialCondutor,
@@ -744,15 +802,14 @@ ipcMain.handle('export-occurrences', async (event) => {
           data.itemApreendido.proprietario || '',
           data.itemApreendido.policial || '',
           data.proprietario.nome,
-          data.proprietario.dataNascimento,
+          isoToBrDate(data.proprietario.dataNascimento),
           data.proprietario.tipoDocumento,
           data.proprietario.numeroDocumento,
           data.policial.nome,
           data.policial.matricula,
           data.policial.graduacao,
           data.policial.unidade,
-          data.metadata.registradoPor,
-          new Date(data.metadata.dataRegistro).toLocaleString('pt-BR')
+          data.metadata.registradoPor
         ]);
       } catch (err) {
         console.error('Erro ao processar arquivo:', file, err);

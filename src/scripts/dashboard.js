@@ -6,6 +6,9 @@ const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
 const logoutBtn = document.getElementById('logoutBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const loadingSubtext = document.getElementById('loadingSubtext');
 
 // Tabs
 const tabDashboard = document.getElementById('tabDashboard');
@@ -69,13 +72,70 @@ window.addEventListener('load', () => {
     loadOccurrences();
 });
 
+// Funções de loading
+function showLoading(text = 'Processando', subtext = 'Aguarde um momento') {
+    loadingText.textContent = text;
+    loadingSubtext.textContent = subtext;
+    loadingOverlay.classList.add('active');
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('active');
+}
+
 // Load occurrences
 async function loadOccurrences() {
     try {
         const result = await ipcRenderer.invoke('get-occurrences');
         if (result.success) {
-            allOccurrences = result.data;
+            // Mapear dados do Google Sheets para a estrutura esperada
+            allOccurrences = result.data.map(row => {
+                // Se já está na estrutura correta, retorna como está
+                if (row.ocorrencia && row.itemApreendido && row.proprietario && row.policial) {
+                    return row;
+                }
+                
+                // Caso contrário, mapeia da estrutura do Google Sheets
+                return {
+                    ocorrencia: {
+                        numeroGenesis: row.numeroGenesis || '',
+                        unidade: row.unidade || '',
+                        dataApreensao: row.dataApreensao || '',
+                        leiInfrigida: row.leiInfrigida || '',
+                        artigo: row.artigo || '',
+                        policialCondutor: row.policialCondutor || ''
+                    },
+                    itemApreendido: {
+                        especie: row.especie || '',
+                        item: row.item || '',
+                        quantidade: row.quantidade || '',
+                        unidadeMedida: row.unidadeMedida || '',
+                        descricao: row.descricaoItem || '',
+                        ocorrencia: row.ocorrenciaItem || '',
+                        proprietario: row.proprietarioItem || '',
+                        policial: row.policialItem || ''
+                    },
+                    proprietario: {
+                        nome: row.nomeProprietario || '',
+                        dataNascimento: row.dataNascimento || '',
+                        tipoDocumento: row.tipoDocumento || '',
+                        numeroDocumento: row.numeroDocumento || ''
+                    },
+                    policial: {
+                        nome: row.nomePolicialCompleto || row.nomePolicial || '',
+                        matricula: row.matricula || '',
+                        graduacao: row.graduacao || '',
+                        unidade: row.unidadePolicial || ''
+                    },
+                    metadata: {
+                        registradoPor: row.registradoPor || '',
+                        dataRegistro: row.logRegistro || new Date().toISOString()
+                    }
+                };
+            });
+            
             filteredOccurrences = [...allOccurrences];
+            console.log('Ocorrências carregadas:', allOccurrences.length);
             updateStats();
             renderTable();
         } else {
@@ -308,7 +368,7 @@ function showModal(editable) {
         </div>
     `;
 
-    btnDelete.style.display = editable ? 'inline-flex' : 'none';
+    btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
     btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
     
     viewModal.classList.add('active');
@@ -357,44 +417,51 @@ async function saveEdit() {
         metadata: currentOccurrence.metadata
     };
 
+    showLoading('Atualizando ocorrência', 'Salvando alterações...');
     try {
         const result = await ipcRenderer.invoke('update-occurrence', updatedData);
+        hideLoading();
         if (result.success) {
-            alert('Ocorrência atualizada com sucesso!');
+            customAlert.success('Ocorrência atualizada com sucesso!');
             closeModal();
             loadOccurrences();
         } else {
-            alert('Erro ao atualizar ocorrência: ' + result.message);
+            customAlert.error('Erro ao atualizar: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao atualizar ocorrência: ' + error.message);
+        console.error('Erro ao atualizar:', error);
+        hideLoading();
+        customAlert.error('Erro ao atualizar ocorrência');
     }
 }
 
-// Confirm delete
+// Open delete modal
 window.confirmDelete = function(index) {
     currentOccurrence = filteredOccurrences[index];
     deleteOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     deleteModal.classList.add('active');
 };
 
-// Delete occurrence
-async function deleteOccurrence() {
+// Execute delete occurrence
+async function executeDelete() {
     if (!currentOccurrence) return;
 
+    showLoading('Excluindo ocorrência', 'Removendo do sistema...');
     try {
         const result = await ipcRenderer.invoke('delete-occurrence', currentOccurrence.ocorrencia.numeroGenesis);
+        hideLoading();
         if (result.success) {
-            alert('Ocorrência excluída com sucesso!');
+            customAlert.success('Ocorrência excluída com sucesso!');
             deleteModal.classList.remove('active');
-            viewModal.classList.remove('active');
-            currentOccurrence = null;
+            closeModal();
             loadOccurrences();
         } else {
-            alert('Erro ao excluir ocorrência: ' + result.message);
+            customAlert.error('Erro ao excluir: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao excluir ocorrência: ' + error.message);
+        console.error('Erro ao excluir:', error);
+        hideLoading();
+        customAlert.error('Erro ao excluir ocorrência');
     }
 }
 
@@ -413,32 +480,41 @@ function closePrintModal() {
 // Print Termo de Apreensão
 async function printTermoApreensao() {
     if (!currentOccurrence) return;
-
+    
+    printModal.classList.remove('active');
+    showLoading('Gerando documento', 'Criando Termo de Apreensão...');
+    
     try {
-        // Fechar modal imediatamente
         closePrintModal();
         
         // Gerar e exibir prévia do documento
         const result = await ipcRenderer.invoke('print-termo-apreensao', currentOccurrence);
+        hideLoading();
         if (!result.success) {
-            alert('Erro ao gerar documento: ' + result.message);
+            customAlert.error('Erro ao gerar documento: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao gerar documento: ' + error.message);
+        console.error('Erro ao gerar documento:', error);
+        hideLoading();
+        customAlert.error('Erro ao gerar documento');
     }
 }
 
 // Export to Excel
 async function exportToExcel() {
+    showLoading('Exportando dados', 'Gerando arquivo Excel...');
     try {
         const result = await ipcRenderer.invoke('export-occurrences');
+        hideLoading();
         if (result.success) {
-            alert('Arquivo Excel exportado com sucesso!\n\nLocal: ' + result.filePath);
+            customAlert.success('Arquivo Excel exportado com sucesso!<br><br><strong>Local:</strong> ' + result.filePath);
         } else {
-            alert('Erro ao exportar: ' + result.message);
+            customAlert.error('Erro ao exportar: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao exportar: ' + error.message);
+        console.error('Erro ao exportar:', error);
+        hideLoading();
+        customAlert.error('Erro ao exportar arquivo');
     }
 }
 
@@ -526,20 +602,20 @@ document.addEventListener('click', (e) => {
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-        sessionStorage.clear();
-        ipcRenderer.send('logout');
-    }
+    customAlert.confirm(
+        'Deseja realmente sair do sistema?',
+        () => {
+            sessionStorage.clear();
+            ipcRenderer.send('logout');
+        }
+    );
 });
 
 // Modal events
 modalClose.addEventListener('click', closeModal);
 btnCancelEdit.addEventListener('click', closeModal);
 btnSaveEdit.addEventListener('click', saveEdit);
-btnDelete.addEventListener('click', () => {
-    closeModal();
-    confirmDelete(filteredOccurrences.indexOf(currentOccurrence));
-});
+// Botão de deletar removido do modal de edição
 
 deleteModalClose.addEventListener('click', () => {
     deleteModal.classList.remove('active');
@@ -547,7 +623,7 @@ deleteModalClose.addEventListener('click', () => {
 btnCancelDelete.addEventListener('click', () => {
     deleteModal.classList.remove('active');
 });
-btnConfirmDelete.addEventListener('click', deleteOccurrence);
+btnConfirmDelete.addEventListener('click', executeDelete);
 
 printModalClose.addEventListener('click', closePrintModal);
 btnCancelPrint.addEventListener('click', closePrintModal);

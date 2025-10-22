@@ -17,7 +17,7 @@ loginForm.addEventListener('submit', async (e) => {
         return;
     }
     
-    // Desabilitar botão e mostrar loading
+    // Desabilitar botão
     setLoading(true);
     hideError();
     
@@ -32,20 +32,20 @@ loginForm.addEventListener('submit', async (e) => {
                 sessionStorage.setItem('userData', JSON.stringify(result.userData));
             }
             
-            // Carregar dashboard diretamente
+            // Carregar dashboard
             ipcRenderer.send('load-dashboard');
         } else {
             // Exibir mensagem de erro categorizada
-            const errorMessage = result?.message || 'Falha na autenticação. Verifique suas credenciais.';
-            showError(errorMessage);
             setLoading(false);
+            const errorMsg = result?.message || 'Falha na autenticação. Verifique suas credenciais.';
+            showError(errorMsg);
         }
     } catch (error) {
         console.error('Erro na autenticação:', error);
-        // Se o erro for um objeto, tentar extrair a mensagem
-        const errorMessage = error?.message || error?.toString() || 'Erro ao conectar com o servidor de autenticação.';
-        showError(errorMessage);
         setLoading(false);
+        // Se o erro for um objeto, tentar extrair a mensagem
+        const errorMsg = error?.message || error?.toString() || 'Erro ao conectar com o servidor de autenticação.';
+        showError(errorMsg);
     }
 });
 

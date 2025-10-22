@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SECRIMPO PMDF - REGISTROS</title>
     <link rel="stylesheet" href="../styles/panel.css">
+    <link rel="stylesheet" href="../styles/loading.css">
+    <link rel="stylesheet" href="../styles/custom-alert.css">
 </head>
 <body>
     <div class="app-container">
@@ -246,6 +248,16 @@
         </main>
     </div>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">Processando</div>
+            <div class="loading-subtext" id="loadingSubtext">Aguarde um momento</div>
+        </div>
+    </div>
+
+    <script src="../scripts/custom-alert.js"></script>
     <script src="../scripts/panel.js"></script>
 </body>
 </html>
