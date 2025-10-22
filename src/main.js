@@ -2,6 +2,33 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const XLSX = require('xlsx');
+const fs = require('fs');
+
+// Configurar pastas de salvamento
+const BASE_DIR = 'C:\\SECRIMPO';
+const FOLDERS = {
+  ocorrencias: path.join(BASE_DIR, 'Ocorrencias'),
+  exportacoes: path.join(BASE_DIR, 'Exportacao'),
+  termos: path.join(BASE_DIR, 'Termos')
+};
+
+// Criar pastas se não existirem
+function ensureFolders() {
+  Object.values(FOLDERS).forEach(folder => {
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder, { recursive: true });
+    }
+  });
+}
+
+// Formatar data para nome de arquivo [dd.mm.yyyy]
+function formatDateForFilename() {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  return `${day}.${month}.${year}`;
+}
 
 // .env não é mais necessário - credenciais estão hardcoded no auth_keyauth.exe
 // require('dotenv').config({ path: path.join(__dirname, '../.env') });
@@ -48,6 +75,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ensureFolders();
   createWindow();
 
   app.on('activate', function () {
@@ -203,109 +231,16 @@ ipcMain.handle('save-occurrence', async (event, data) => {
   try {
     console.log('Dados da ocorrência:', JSON.stringify(data, null, 2));
     
-    const fs = require('fs');
-    const os = require('os');
+    // Formato: [NumeroGenesis][dd.mm.yyyy]
+    const dateStr = formatDateForFilename();
+    const numeroGenesis = data.ocorrencia.numeroGenesis;
     
-    // Usar diretório temporário do sistema para evitar conflitos
-    const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
-    
-    // Verificar se existe e é um arquivo (não diretório)
-    if (fs.existsSync(dataDir)) {
-      const stats = fs.statSync(dataDir);
-      if (!stats.isDirectory()) {
-        // Se for um arquivo, remover
-        fs.unlinkSync(dataDir);
-      }
-    }
-    
-    // Criar diretório se não existir
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    
-    const timestamp = new Date().getTime();
-    
-    // Salvar JSON (backup)
-    const jsonFilename = `ocorrencia_${data.ocorrencia.numeroGenesis}_${timestamp}.json`;
-    const jsonFilepath = path.join(dataDir, jsonFilename);
+    // Salvar JSON (backup) em C:\SECRIMPO\Ocorrencias
+    const jsonFilename = `[${numeroGenesis}][${dateStr}].json`;
+    const jsonFilepath = path.join(FOLDERS.ocorrencias, jsonFilename);
     fs.writeFileSync(jsonFilepath, JSON.stringify(data, null, 2));
     
-    // Criar arquivo Excel
-    const excelFilename = `ocorrencia_${data.ocorrencia.numeroGenesis}_${timestamp}.xlsx`;
-    const excelFilepath = path.join(dataDir, excelFilename);
-    
-    // Preparar dados para a planilha (ordem do formulário)
-    const worksheetData = [
-      // Cabeçalhos (24 colunas)
-      [
-        'Log Registro',
-        'Nº Genesis',
-        'Unidade',
-        'Data Apreensão',
-        'Lei Infringida',
-        'Artigo',
-        'Policial Condutor',
-        'Espécie',
-        'Item',
-        'Quantidade',
-        'Unidade de Medida',
-        'Descrição',
-        'Ocorrência Item',
-        'Proprietário Item',
-        'Policial Item',
-        'Nome Proprietário',
-        'Data Nascimento',
-        'Tipo Documento',
-        'Nº Documento',
-        'Nome Policial',
-        'Matrícula',
-        'Graduação',
-        'Unidade Policial',
-        'Registrado Por'
-      ],
-      // Dados (ordem do formulário)
-      [
-        new Date().toLocaleString('pt-BR'),
-        data.ocorrencia.numeroGenesis,
-        data.ocorrencia.unidade,
-        isoToBrDate(data.ocorrencia.dataApreensao),
-        data.ocorrencia.leiInfrigida,
-        data.ocorrencia.artigo,
-        data.ocorrencia.policialCondutor,
-        data.itemApreendido.especie,
-        data.itemApreendido.item,
-        data.itemApreendido.quantidade,
-        data.itemApreendido.unidadeMedida || '',
-        data.itemApreendido.descricao,
-        data.itemApreendido.ocorrencia || '',
-        data.itemApreendido.proprietario || '',
-        data.itemApreendido.policial || '',
-        data.proprietario.nome,
-        isoToBrDate(data.proprietario.dataNascimento),
-        data.proprietario.tipoDocumento,
-        data.proprietario.numeroDocumento,
-        data.policial.nome,
-        data.policial.matricula,
-        data.policial.graduacao,
-        data.policial.unidade,
-        data.metadata.registradoPor
-      ]
-    ];
-    
-    // Criar workbook e worksheet
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    
-    // Ajustar largura das colunas
-    const columnWidths = worksheetData[0].map(() => ({ wch: 20 }));
-    worksheet['!cols'] = columnWidths;
-    
-    // Adicionar worksheet ao workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ocorrências');
-    
-    // Salvar arquivo Excel
-    XLSX.writeFile(workbook, excelFilepath);
-    console.log('✓ Arquivo Excel criado:', excelFilepath);
+    console.log('✓ JSON salvo em:', jsonFilepath);
     
     // Enviar para Google Sheets (se configurado)
     const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec"; // Cole sua URL do Google Apps Script aqui
@@ -407,9 +342,8 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     
     return { 
       success: true, 
-      message: 'Ocorrência registrada com sucesso! Arquivo Excel gerado.',
-      file: excelFilename,
-      excelPath: excelFilepath
+      message: 'Ocorrência registrada com sucesso!',
+      jsonPath: jsonFilepath
     };
   } catch (error) {
     console.error('Erro ao salvar ocorrência:', error);
@@ -734,16 +668,12 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
 // IPC Handler para exportar todas as ocorrências para Excel
 ipcMain.handle('export-occurrences', async (event) => {
   try {
-    const fs = require('fs');
-    const os = require('os');
-    
-    const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
-    
-    if (!fs.existsSync(dataDir)) {
+    // Ler JSONs da pasta de ocorrências
+    if (!fs.existsSync(FOLDERS.ocorrencias)) {
       return { success: false, message: 'Nenhuma ocorrência encontrada' };
     }
     
-    const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(FOLDERS.ocorrencias).filter(f => f.endsWith('.json'));
     
     if (files.length === 0) {
       return { success: false, message: 'Nenhuma ocorrência encontrada' };
@@ -781,7 +711,7 @@ ipcMain.handle('export-occurrences', async (event) => {
     
     files.forEach(file => {
       try {
-        const filePath = path.join(dataDir, file);
+        const filePath = path.join(FOLDERS.ocorrencias, file);
         const content = fs.readFileSync(filePath, 'utf8');
         const data = JSON.parse(content);
         
@@ -826,12 +756,13 @@ ipcMain.handle('export-occurrences', async (event) => {
     
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Todas Ocorrências');
     
-    // Salvar arquivo
-    const timestamp = new Date().getTime();
-    const exportFilename = `todas_ocorrencias_${timestamp}.xlsx`;
-    const exportPath = path.join(dataDir, exportFilename);
+    // Salvar arquivo em C:\SECRIMPO\Exportacao
+    const dateStr = formatDateForFilename();
+    const exportFilename = `[EXPORTACAO][${dateStr}].xlsx`;
+    const exportPath = path.join(FOLDERS.exportacoes, exportFilename);
     
     XLSX.writeFile(workbook, exportPath);
+    console.log('✓ Exportação salva em:', exportPath);
     
     return { 
       success: true, 
@@ -876,14 +807,11 @@ ipcMain.handle('print-termo-apreensao', async (event, occurrenceData) => {
     // Aguardar para garantir que os dados foram preenchidos
     await new Promise(resolve => setTimeout(resolve, 800));
 
-    // Gerar PDF
-    const dataDir = path.join(os.tmpdir(), 'secrimpo-pmdf-data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-
-    const pdfFilename = `termo_apreensao_${occurrenceData.ocorrencia.numeroGenesis}_${Date.now()}.pdf`;
-    const pdfPath = path.join(dataDir, pdfFilename);
+    // Gerar PDF em C:\SECRIMPO\Termos
+    const dateStr = formatDateForFilename();
+    const numeroGenesis = occurrenceData.ocorrencia.numeroGenesis;
+    const pdfFilename = `[${numeroGenesis}][${dateStr}].pdf`;
+    const pdfPath = path.join(FOLDERS.termos, pdfFilename);
 
     const pdfData = await tempWindow.webContents.printToPDF({
       printBackground: true,
