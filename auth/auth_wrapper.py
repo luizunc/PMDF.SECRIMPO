@@ -13,7 +13,7 @@ sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure'
 
 # Configurações KeyAuth
 KEYAUTH_NAME = "SECRIMPO"
-KEYAUTH_OWNERID = "iqvgrWhiYz"
+KEYAUTH_OWNERID = "4Roety0GwG"
 KEYAUTH_VERSION = "1.0"
 
 # Importar KeyAuth oficial

@@ -16,6 +16,17 @@ secrets.json
 auth_token*
 api_key*
 
+# KeyAuth - Credenciais de autenticação (owner_id, name, version)
+auth/auth_wrapper.py
+auth/keyauth.py
+auth_config.json
+keyauth_config.json
+
+# Google Sheets - URLs e credenciais
+sheets_config.json
+google_sheets_url.txt
+*sheets_credentials*
+
 # ========================================
 # BUILDS E DISTRIBUIÇÃO - NÃO VERSIONAR
 # ========================================
