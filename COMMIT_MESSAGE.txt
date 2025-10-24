@@ -1,0 +1,16 @@
+Feat: implementa sistema de geração e impressão de termos de apreensão com integração Google Sheets
+
+Add:
+1. google-apps-script.gs - Script para integração com Google Sheets
+2. src/scripts/custom-alert.js - Sistema de alertas customizados
+3. src/styles/custom-alert.css - Estilos para alertas modais
+4. src/styles/loading.css - Estilos para loading overlay
+5. src/templates/termo_apreensao.html - Template para geração de PDF
+6. src/views/pdf_viewer.html - Visualizador de PDF com impressão
+7. auth/auth_keyauth.spec - Especificação para build da autenticação
+
+Edit:
+1. .gitignore - Adicionadas regras para credenciais KeyAuth e Google Sheets
+
+Remove:
+- Nenhum arquivo removido

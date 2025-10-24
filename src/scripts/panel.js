@@ -9,6 +9,9 @@ const errorMessage = document.getElementById('errorMessage');
 const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const loadingSubtext = document.getElementById('loadingSubtext');
 
 // Navigation tabs
 const tabDashboard = document.getElementById('tabDashboard');
@@ -62,13 +65,10 @@ occurrenceForm.addEventListener('submit', async (e) => {
             item: document.getElementById('item').value,
             quantidade: document.getElementById('quantidade').value,
             unidadeMedida: document.getElementById('unidadeMedida').value,
-            peso: document.getElementById('peso').value,
             descricao: document.getElementById('descricaoItem').value,
             ocorrencia: document.getElementById('ocorrenciaItem').value,
             proprietario: document.getElementById('proprietarioItem').value,
-            policial: document.getElementById('policialItem').value,
-            valor: document.getElementById('valorItem').value,
-            numeroSerie: document.getElementById('numeroSerie').value
+            policial: document.getElementById('policialItem').value
         },
         proprietario: {
             nome: document.getElementById('nomeProprietario').value,
@@ -88,35 +88,41 @@ occurrenceForm.addEventListener('submit', async (e) => {
         }
     };
     
-    // Desabilitar botão e mostrar loading
-    setLoading(true);
+    // Mostrar loading global
+    showLoading('Salvando ocorrência', 'Enviando dados para o sistema...');
     hideMessages();
     
     try {
         const result = await ipcRenderer.invoke('save-occurrence', formData);
         
         if (result.success) {
+            hideLoading();
             showSuccess(result.message);
             // Limpar formulário após sucesso
             setTimeout(() => {
                 clearForm();
             }, 2000);
         } else {
+            hideLoading();
             showError(result.message || 'Erro ao salvar ocorrência');
         }
     } catch (error) {
         console.error('Erro ao salvar:', error);
+        hideLoading();
         showError('Erro ao salvar ocorrência: ' + error.message);
-    } finally {
-        setLoading(false);
     }
 });
 
 // Limpar formulário
 clearBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente limpar todos os campos do formulário?')) {
-        clearForm();
-    }
+    customAlert.confirm(
+        'Deseja realmente limpar todos os campos do formulário?',
+        () => {
+            clearForm();
+        },
+        null,
+        'Limpar Formulário'
+    );
 });
 
 // Toggle do menu do usuário
@@ -134,25 +140,26 @@ document.addEventListener('click', (e) => {
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-        sessionStorage.clear();
-        ipcRenderer.send('logout');
-    }
+    customAlert.confirm(
+        'Deseja realmente sair do sistema?',
+        () => {
+            sessionStorage.clear();
+            ipcRenderer.send('logout');
+        }
+    );
 });
 
 // Funções auxiliares
-function setLoading(loading) {
-    submitBtn.disabled = loading;
-    const btnText = submitBtn.querySelector('.btn-text');
-    const btnLoader = submitBtn.querySelector('.btn-loader');
-    
-    if (loading) {
-        btnText.style.display = 'none';
-        btnLoader.style.display = 'inline-block';
-    } else {
-        btnText.style.display = 'inline-block';
-        btnLoader.style.display = 'none';
-    }
+function showLoading(text = 'Processando', subtext = 'Aguarde um momento') {
+    loadingText.textContent = text;
+    loadingSubtext.textContent = subtext;
+    loadingOverlay.classList.add('active');
+    submitBtn.disabled = true;
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('active');
+    submitBtn.disabled = false;
 }
 
 function showSuccess(message) {
@@ -175,6 +182,7 @@ function hideMessages() {
 function clearForm() {
     occurrenceForm.reset();
     hideMessages();
+    hideLoading();
     
     // Redefinir data atual no formato brasileiro
     const today = new Date();
@@ -332,99 +340,3 @@ tabDashboard.addEventListener('click', () => {
     ipcRenderer.send('load-dashboard');
 });
 
-// Função para formatar valor monetário: R$ 1.500,00
-function formatMoney(value) {
-    // Remove tudo que não é dígito
-    value = value.replace(/\D/g, '');
-    
-    // Converte para centavos
-    value = (parseInt(value) / 100).toFixed(2);
-    
-    // Formata com separadores
-    value = value.replace('.', ',');
-    value = value.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-    
-    return value;
-}
-
-// Aplicar máscara no campo de valor
-document.getElementById('valorItem').addEventListener('input', function(e) {
-    let value = e.target.value;
-    e.target.value = formatMoney(value);
-});
-
-// Adicionar placeholder com exemplo no campo de valor
-document.getElementById('valorItem').addEventListener('focus', function(e) {
-    if (!e.target.value) {
-        e.target.placeholder = 'Ex: 1.500,00';
-    }
-});
-
-// Controlar visibilidade do campo de peso baseado na unidade de medida
-document.getElementById('unidadeMedida').addEventListener('change', function(e) {
-    const pesoGroup = document.getElementById('pesoGroup');
-    const pesoInput = document.getElementById('peso');
-    const unidadesSelecionadas = ['mg', 'g', 'kg', 't'];
-    
-    if (unidadesSelecionadas.includes(e.target.value)) {
-        // Mostrar campo de peso com animação
-        pesoGroup.style.display = 'block';
-        pesoGroup.classList.add('show');
-        pesoInput.required = true;
-        
-        // Atualizar placeholder e texto de ajuda baseado na unidade
-        const unidadeTexto = {
-            'mg': 'Ex: 500',
-            'g': 'Ex: 10', 
-            'kg': 'Ex: 2.5',
-            't': 'Ex: 1.2'
-        };
-        
-        const unidadeNome = {
-            'mg': 'miligramas',
-            'g': 'gramas',
-            'kg': 'quilogramas', 
-            't': 'toneladas'
-        };
-        
-        pesoInput.placeholder = unidadeTexto[e.target.value] || 'Digite o peso';
-        
-        // Atualizar texto de ajuda
-        const helpText = pesoGroup.querySelector('.field-help');
-        if (helpText) {
-            helpText.textContent = `Digite o peso em ${unidadeNome[e.target.value]}`;
-        }
-        
-        // Focar no campo de peso
-        setTimeout(() => {
-            pesoInput.focus();
-        }, 300);
-    } else {
-        // Esconder campo de peso com animação
-        pesoGroup.classList.remove('show');
-        setTimeout(() => {
-            pesoGroup.style.display = 'none';
-        }, 300);
-        pesoInput.required = false;
-        pesoInput.value = '';
-    }
-});
-
-// Validação do campo de peso (apenas números e vírgula/ponto decimal)
-document.getElementById('peso').addEventListener('input', function(e) {
-    let value = e.target.value;
-    
-    // Permitir apenas números, vírgula e ponto
-    value = value.replace(/[^0-9.,]/g, '');
-    
-    // Substituir vírgula por ponto para padronização
-    value = value.replace(',', '.');
-    
-    // Permitir apenas um ponto decimal
-    const parts = value.split('.');
-    if (parts.length > 2) {
-        value = parts[0] + '.' + parts.slice(1).join('');
-    }
-    
-    e.target.value = value;
-});

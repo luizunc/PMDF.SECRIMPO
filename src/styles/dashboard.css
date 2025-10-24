@@ -547,13 +547,13 @@ body {
     color: white;
 }
 
-.btn-label {
-    background: #f3e5f5;
-    color: #7b1fa2;
+.btn-print {
+    background: #e8f5e9;
+    color: #2e7d32;
 }
 
-.btn-label:hover {
-    background: #7b1fa2;
+.btn-print:hover {
+    background: #2e7d32;
     color: white;
 }
 
@@ -896,175 +896,46 @@ body {
         width: 100%;
     }
 }
-/* Label Modal Styles */
-.label-modal .modal-content {
-    max-width: 900px;
-    width: 90%;
-}
 
-.label-container {
-    border: 2px solid #000;
-    background: white;
-    padding: 20px;
-    margin: 20px 0;
-}
-
-.label-header {
+/* Print Modal Styles */
+.print-info {
+    background: #f5f5f5;
+    padding: 12px 16px;
+    border-radius: 8px;
     margin-bottom: 20px;
+    color: #071d49;
 }
 
-.label-logos {
+.print-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.print-option-btn {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.label-logo-left,
-.label-logo-right {
-    width: 80px;
-    height: 80px;
-    object-fit: contain;
-}
-
-.label-title {
-    text-align: center;
-    flex: 1;
-    margin: 0 20px;
-}
-
-.label-title-main {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #000;
-}
-
-.label-title-sub {
-    font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 2px;
-    color: #000;
-}
-
-.label-content {
-    margin-top: 20px;
-}
-
-.label-row {
-    display: flex;
-    margin-bottom: 10px;
-    gap: 10px;
-}
-
-.label-field {
-    flex: 1;
-    border: 1px solid #000;
-    min-height: 50px;
-}
-
-.label-field-title {
-    background: #000;
-    color: white;
-    padding: 8px 10px;
-    font-size: 12px;
-    font-weight: bold;
-    text-align: center;
-    text-transform: uppercase;
-}
-
-.label-field-value {
-    padding: 15px 10px;
-    font-size: 16px;
-    font-weight: bold;
-    text-align: center;
-    min-height: 20px;
-    color: #000;
+    gap: 12px;
+    padding: 16px 20px;
     background: white;
-}
-
-/* Responsive adjustments for label */
-@media (max-width: 768px) {
-    .label-modal .modal-content {
-        width: 95%;
-        margin: 10px;
-    }
-    
-    .label-container {
-        padding: 15px;
-    }
-    
-    .label-logos {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .label-title {
-        margin: 15px 0;
-    }
-    
-    .label-row {
-        flex-direction: column;
-        gap: 5px;
-    }
-    
-    .label-field-title {
-        font-size: 11px;
-        padding: 6px 8px;
-    }
-    
-    .label-field-value {
-        font-size: 14px;
-        padding: 12px 8px;
-    }
-}
-/* Modal f
-ooter buttons */
-.modal-footer {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    padding: 20px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.btn-primary, .btn-secondary {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
     transition: all 0.3s ease;
+    font-size: 15px;
+    font-weight: 600;
+    color: #071d49;
 }
 
-.btn-primary {
-    background: #279b4d;
-    color: white;
+.print-option-btn:hover {
+    border-color: #279b4d;
+    background: #f1f8f4;
+    transform: translateX(5px);
 }
 
-.btn-primary:hover {
-    background: #1e7a3a;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: #545b62;
-}
-
-/* Responsive modal footer */
-@media (max-width: 768px) {
-    .modal-footer {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .btn-primary, .btn-secondary {
-        width: 100%;
-        padding: 12px;
-    }
+.print-option-btn svg {
+    width: 24px;
+    height: 24px;
+    color: #279b4d;
+    flex-shrink: 0;
 }

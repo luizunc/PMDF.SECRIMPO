@@ -6,6 +6,9 @@ const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
 const logoutBtn = document.getElementById('logoutBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+const loadingSubtext = document.getElementById('loadingSubtext');
 
 // Tabs
 const tabDashboard = document.getElementById('tabDashboard');
@@ -43,78 +46,17 @@ const deleteOccurrenceId = document.getElementById('deleteOccurrenceId');
 const btnCancelDelete = document.getElementById('btnCancelDelete');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
+const printModal = document.getElementById('printModal');
+const printModalClose = document.getElementById('printModalClose');
+const printOccurrenceId = document.getElementById('printOccurrenceId');
+const btnCancelPrint = document.getElementById('btnCancelPrint');
+const btnPrintTermoApreensao = document.getElementById('btnPrintTermoApreensao');
+
 // State
 let allOccurrences = [];
 let filteredOccurrences = [];
 let currentOccurrence = null;
 let isEditMode = false;
-
-// Utility functions
-function formatDate(dateString) {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-}
-
-function formatDateBR(dateString) {
-    if (!dateString) return '';
-    // Se já está no formato dd/mm/yyyy, retorna como está
-    if (dateString.includes('/')) return dateString;
-    // Se está no formato ISO, converte
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-}
-
-function brDateToISO(brDate) {
-    if (!brDate) return '';
-    const [day, month, year] = brDate.split('/');
-    return `${year}-${month}-${day}`;
-}
-
-// Função para extrair valor do peso de forma robusta
-function getPesoValue(occurrence) {
-    // Primeiro, tenta pegar o campo peso diretamente
-    if (occurrence.itemApreendido && occurrence.itemApreendido.peso) {
-        const unidade = occurrence.itemApreendido.unidadeMedida || '';
-        return occurrence.itemApreendido.peso + (unidade ? ' ' + unidade : '');
-    }
-
-    // Se não tem campo peso, mas tem quantidade e unidade de peso, usa esses
-    if (occurrence.itemApreendido && occurrence.itemApreendido.quantidade && occurrence.itemApreendido.unidadeMedida) {
-        const unidades = ['mg', 'g', 'kg', 't'];
-        if (unidades.includes(occurrence.itemApreendido.unidadeMedida.toLowerCase())) {
-            return occurrence.itemApreendido.quantidade + ' ' + occurrence.itemApreendido.unidadeMedida;
-        }
-    }
-
-    return '-';
-}
-
-// Função para extrair número de série de forma robusta
-function getNumeroSerieValue(occurrence) {
-    // Tenta diferentes possíveis nomes do campo
-    if (occurrence.itemApreendido) {
-        return occurrence.itemApreendido.numeroSerie ||
-            occurrence.itemApreendido.numero_serie ||
-            occurrence.itemApreendido.numeroserie ||
-            '-';
-    }
-    return '-';
-}
-
-// Função para extrair valor monetário de forma robusta
-function getValorValue(occurrence) {
-    if (occurrence.itemApreendido && occurrence.itemApreendido.valor) {
-        const valor = occurrence.itemApreendido.valor.toString();
-        // Se já tem R$, retorna como está
-        if (valor.includes('R$')) {
-            return valor;
-        }
-        // Se não tem R$, adiciona
-        return 'R$ ' + valor;
-    }
-    return '-';
-}
 
 // Charts
 let lineChart = null;
@@ -130,13 +72,70 @@ window.addEventListener('load', () => {
     loadOccurrences();
 });
 
+// Funções de loading
+function showLoading(text = 'Processando', subtext = 'Aguarde um momento') {
+    loadingText.textContent = text;
+    loadingSubtext.textContent = subtext;
+    loadingOverlay.classList.add('active');
+}
+
+function hideLoading() {
+    loadingOverlay.classList.remove('active');
+}
+
 // Load occurrences
 async function loadOccurrences() {
     try {
         const result = await ipcRenderer.invoke('get-occurrences');
         if (result.success) {
-            allOccurrences = result.data;
+            // Mapear dados do Google Sheets para a estrutura esperada
+            allOccurrences = result.data.map(row => {
+                // Se já está na estrutura correta, retorna como está
+                if (row.ocorrencia && row.itemApreendido && row.proprietario && row.policial) {
+                    return row;
+                }
+                
+                // Caso contrário, mapeia da estrutura do Google Sheets
+                return {
+                    ocorrencia: {
+                        numeroGenesis: row.numeroGenesis || '',
+                        unidade: row.unidade || '',
+                        dataApreensao: row.dataApreensao || '',
+                        leiInfrigida: row.leiInfrigida || '',
+                        artigo: row.artigo || '',
+                        policialCondutor: row.policialCondutor || ''
+                    },
+                    itemApreendido: {
+                        especie: row.especie || '',
+                        item: row.item || '',
+                        quantidade: row.quantidade || '',
+                        unidadeMedida: row.unidadeMedida || '',
+                        descricao: row.descricaoItem || '',
+                        ocorrencia: row.ocorrenciaItem || '',
+                        proprietario: row.proprietarioItem || '',
+                        policial: row.policialItem || ''
+                    },
+                    proprietario: {
+                        nome: row.nomeProprietario || '',
+                        dataNascimento: row.dataNascimento || '',
+                        tipoDocumento: row.tipoDocumento || '',
+                        numeroDocumento: row.numeroDocumento || ''
+                    },
+                    policial: {
+                        nome: row.nomePolicialCompleto || row.nomePolicial || '',
+                        matricula: row.matricula || '',
+                        graduacao: row.graduacao || '',
+                        unidade: row.unidadePolicial || ''
+                    },
+                    metadata: {
+                        registradoPor: row.registradoPor || '',
+                        dataRegistro: row.logRegistro || new Date().toISOString()
+                    }
+                };
+            });
+            
             filteredOccurrences = [...allOccurrences];
+            console.log('Ocorrências carregadas:', allOccurrences.length);
             updateStats();
             renderTable();
         } else {
@@ -157,19 +156,21 @@ function updateStats() {
     // Count this month
     const now = new Date();
     const thisMonth = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate.getMonth() === now.getMonth() &&
-            occDate.getFullYear() === now.getFullYear();
+        return occDate.getMonth() === now.getMonth() && 
+               occDate.getFullYear() === now.getFullYear();
     }).length;
     statMes.textContent = thisMonth;
 
     // Count today
     const today = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate.toDateString() === now.toDateString();
     }).length;
     statHoje.textContent = today;
-
+    
     // Update charts
     updateCharts();
 }
@@ -187,10 +188,10 @@ function renderTable() {
     filteredOccurrences.forEach((occ, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td><strong>${occ.ocorrencia.numeroGenesis}</strong></td>
-            <td>${formatDate(occ.ocorrencia.dataApreensao)}</td>
-            <td>${occ.ocorrencia.unidade}</td>
-            <td>${occ.proprietario.nome}</td>
+            <td><strong>${occ.ocorrencia?.numeroGenesis || 'N/A'}</strong></td>
+            <td>${occ.ocorrencia?.dataApreensao ? formatDate(occ.ocorrencia.dataApreensao) : 'N/A'}</td>
+            <td>${occ.ocorrencia?.unidade || 'N/A'}</td>
+            <td>${occ.proprietario?.nome || 'N/A'}</td>
             <td>
                 <div class="action-buttons">
                     <button class="btn-action btn-view" onclick="viewOccurrence(${index})" title="Ver detalhes">
@@ -205,10 +206,11 @@ function renderTable() {
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
                     </button>
-                    <button class="btn-action btn-label" onclick="showLabel(${index})" title="Etiqueta de Apreensão">
+                    <button class="btn-action btn-print" onclick="openPrintModal(${index})" title="Imprimir">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                            <line x1="7" y1="7" x2="7.01" y2="7"/>
+                            <polyline points="6 9 6 2 18 2 18 9"/>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                            <rect x="6" y="14" width="12" height="8"/>
                         </svg>
                     </button>
                     <button class="btn-action btn-delete-action" onclick="confirmDelete(${index})" title="Excluir">
@@ -225,14 +227,14 @@ function renderTable() {
 }
 
 // View occurrence
-window.viewOccurrence = function (index) {
+window.viewOccurrence = function(index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = false;
     showModal(false);
 };
 
 // Edit occurrence
-window.editOccurrence = function (index) {
+window.editOccurrence = function(index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = true;
     showModal(true);
@@ -255,7 +257,16 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Unidade</label>
-                    <input type="text" id="edit-unidade" value="${currentOccurrence.ocorrencia.unidade}" ${!editable ? 'disabled' : ''}>
+                    ${editable ? `
+                    <select id="edit-unidade" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione...</option>
+                        <option value="8º BPM" ${currentOccurrence.ocorrencia.unidade === '8º BPM' ? 'selected' : ''}>8º BPM</option>
+                        <option value="10º BPM" ${currentOccurrence.ocorrencia.unidade === '10º BPM' ? 'selected' : ''}>10º BPM</option>
+                        <option value="16º BPM" ${currentOccurrence.ocorrencia.unidade === '16º BPM' ? 'selected' : ''}>16º BPM</option>
+                    </select>
+                    ` : `
+                    <input type="text" id="edit-unidade" value="${currentOccurrence.ocorrencia.unidade}" disabled>
+                    `}
                 </div>
                 <div class="modal-form-group">
                     <label>Data da Apreensão</label>
@@ -289,23 +300,7 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Quantidade</label>
-                    <input type="text" id="edit-quantidade" value="${currentOccurrence.itemApreendido.quantidade || ''}" ${!editable ? 'disabled' : ''}>
-                </div>
-                <div class="modal-form-group">
-                    <label>Unidade de Medida</label>
-                    <input type="text" id="edit-unidadeMedida" value="${currentOccurrence.itemApreendido.unidadeMedida || ''}" ${!editable ? 'disabled' : ''}>
-                </div>
-                <div class="modal-form-group">
-                    <label>Peso</label>
-                    <input type="text" id="edit-peso" value="${currentOccurrence.itemApreendido.peso || ''}" ${!editable ? 'disabled' : ''}>
-                </div>
-                <div class="modal-form-group">
-                    <label>Valor (R$)</label>
-                    <input type="text" id="edit-valor" value="${currentOccurrence.itemApreendido.valor || ''}" ${!editable ? 'disabled' : ''}>
-                </div>
-                <div class="modal-form-group">
-                    <label>Número de Série</label>
-                    <input type="text" id="edit-numeroSerie" value="${currentOccurrence.itemApreendido.numeroSerie || ''}" ${!editable ? 'disabled' : ''}>
+                    <input type="text" id="edit-quantidade" value="${currentOccurrence.itemApreendido.quantidade} ${currentOccurrence.itemApreendido.unidadeMedida || ''}" ${!editable ? 'disabled' : ''}>
                 </div>
                 <div class="modal-form-group full-width">
                     <label>Descrição</label>
@@ -373,9 +368,9 @@ function showModal(editable) {
         </div>
     `;
 
-    btnDelete.style.display = editable ? 'inline-flex' : 'none';
+    btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
     btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
-
+    
     viewModal.classList.add('active');
 }
 
@@ -403,12 +398,9 @@ async function saveEdit() {
         itemApreendido: {
             especie: document.getElementById('edit-especie').value,
             item: document.getElementById('edit-item').value,
-            quantidade: document.getElementById('edit-quantidade').value,
-            unidadeMedida: document.getElementById('edit-unidadeMedida').value,
-            peso: document.getElementById('edit-peso').value,
-            descricao: document.getElementById('edit-descricao').value,
-            valor: document.getElementById('edit-valor').value,
-            numeroSerie: document.getElementById('edit-numeroSerie').value
+            quantidade: document.getElementById('edit-quantidade').value.split(' ')[0],
+            unidadeMedida: currentOccurrence.itemApreendido.unidadeMedida,
+            descricao: document.getElementById('edit-descricao').value
         },
         proprietario: {
             nome: document.getElementById('edit-nomeProprietario').value,
@@ -425,77 +417,144 @@ async function saveEdit() {
         metadata: currentOccurrence.metadata
     };
 
+    showLoading('Atualizando ocorrência', 'Salvando alterações...');
     try {
         const result = await ipcRenderer.invoke('update-occurrence', updatedData);
+        hideLoading();
         if (result.success) {
-            alert('Ocorrência atualizada com sucesso!');
+            customAlert.success('Ocorrência atualizada com sucesso!');
             closeModal();
             loadOccurrences();
         } else {
-            alert('Erro ao atualizar ocorrência: ' + result.message);
+            customAlert.error('Erro ao atualizar: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao atualizar ocorrência: ' + error.message);
+        console.error('Erro ao atualizar:', error);
+        hideLoading();
+        customAlert.error('Erro ao atualizar ocorrência');
     }
 }
 
-// Confirm delete
-window.confirmDelete = function (index) {
+// Open delete modal
+window.confirmDelete = function(index) {
     currentOccurrence = filteredOccurrences[index];
     deleteOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     deleteModal.classList.add('active');
 };
 
-// Delete occurrence
-async function deleteOccurrence() {
+// Execute delete occurrence
+async function executeDelete() {
     if (!currentOccurrence) return;
 
+    showLoading('Excluindo ocorrência', 'Removendo do sistema...');
     try {
         const result = await ipcRenderer.invoke('delete-occurrence', currentOccurrence.ocorrencia.numeroGenesis);
+        hideLoading();
         if (result.success) {
-            alert('Ocorrência excluída com sucesso!');
+            customAlert.success('Ocorrência excluída com sucesso!');
             deleteModal.classList.remove('active');
-            viewModal.classList.remove('active');
-            currentOccurrence = null;
+            closeModal();
             loadOccurrences();
         } else {
-            alert('Erro ao excluir ocorrência: ' + result.message);
+            customAlert.error('Erro ao excluir: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao excluir ocorrência: ' + error.message);
+        console.error('Erro ao excluir:', error);
+        hideLoading();
+        customAlert.error('Erro ao excluir ocorrência');
+    }
+}
+
+// Open print modal
+window.openPrintModal = function(index) {
+    currentOccurrence = filteredOccurrences[index];
+    printOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
+    printModal.classList.add('active');
+};
+
+// Close print modal
+function closePrintModal() {
+    printModal.classList.remove('active');
+}
+
+// Print Termo de Apreensão
+async function printTermoApreensao() {
+    if (!currentOccurrence) return;
+    
+    printModal.classList.remove('active');
+    showLoading('Gerando documento', 'Criando Termo de Apreensão...');
+    
+    try {
+        closePrintModal();
+        
+        // Gerar e exibir prévia do documento
+        const result = await ipcRenderer.invoke('print-termo-apreensao', currentOccurrence);
+        hideLoading();
+        if (!result.success) {
+            customAlert.error('Erro ao gerar documento: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Erro ao gerar documento:', error);
+        hideLoading();
+        customAlert.error('Erro ao gerar documento');
     }
 }
 
 // Export to Excel
 async function exportToExcel() {
+    showLoading('Exportando dados', 'Gerando arquivo Excel...');
     try {
         const result = await ipcRenderer.invoke('export-occurrences');
+        hideLoading();
         if (result.success) {
-            alert('Arquivo Excel exportado com sucesso!\n\nLocal: ' + result.filePath);
+            customAlert.success('Arquivo Excel exportado com sucesso!<br><br><strong>Local:</strong> ' + result.filePath);
         } else {
-            alert('Erro ao exportar: ' + result.message);
+            customAlert.error('Erro ao exportar: ' + result.message);
         }
     } catch (error) {
-        alert('Erro ao exportar: ' + error.message);
+        console.error('Erro ao exportar:', error);
+        hideLoading();
+        customAlert.error('Erro ao exportar arquivo');
     }
 }
 
 // Search
 searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-
+    const query = e.target.value.toLowerCase().trim();
+    
     if (!query) {
         filteredOccurrences = [...allOccurrences];
     } else {
         filteredOccurrences = allOccurrences.filter(occ => {
-            return occ.ocorrencia.numeroGenesis.toLowerCase().includes(query) ||
-                occ.ocorrencia.unidade.toLowerCase().includes(query) ||
-                occ.proprietario.nome.toLowerCase().includes(query) ||
-                occ.policial.nome.toLowerCase().includes(query) ||
-                occ.itemApreendido.item.toLowerCase().includes(query);
+            try {
+                // Tentar diferentes possíveis estruturas de dados
+                let numeroGenesis = '';
+                
+                if (occ.ocorrencia?.numeroGenesis) {
+                    numeroGenesis = occ.ocorrencia.numeroGenesis;
+                }
+                else if (occ.numeroGenesis) {
+                    numeroGenesis = occ.numeroGenesis;
+                }
+                else if (occ['Nº Genesis']) {
+                    numeroGenesis = occ['Nº Genesis'];
+                }
+                else if (occ['numeroGenesis']) {
+                    numeroGenesis = occ['numeroGenesis'];
+                }
+                else if (occ['numero_genesis']) {
+                    numeroGenesis = occ['numero_genesis'];
+                }
+                
+                const numeroGenesisLower = (numeroGenesis || '').toString().toLowerCase();
+                return numeroGenesisLower.includes(query);
+            } catch (error) {
+                console.error('Erro ao filtrar ocorrência:', error, occ);
+                return false;
+            }
         });
     }
-
+    
     renderTable();
 });
 
@@ -515,11 +574,11 @@ tabNovaOcorrencia.addEventListener('click', () => {
 function setActiveTab(tab) {
     // Remove active from all tabs
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-
+    
     // Hide all sections
     sectionDashboard.style.display = 'none';
     sectionOcorrencias.style.display = 'none';
-
+    
     if (tab === 'dashboard') {
         tabDashboard.classList.add('active');
         sectionDashboard.style.display = 'block';
@@ -543,20 +602,20 @@ document.addEventListener('click', (e) => {
 
 // Logout
 logoutBtn.addEventListener('click', () => {
-    if (confirm('Deseja realmente sair do sistema?')) {
-        sessionStorage.clear();
-        ipcRenderer.send('logout');
-    }
+    customAlert.confirm(
+        'Deseja realmente sair do sistema?',
+        () => {
+            sessionStorage.clear();
+            ipcRenderer.send('logout');
+        }
+    );
 });
 
 // Modal events
 modalClose.addEventListener('click', closeModal);
 btnCancelEdit.addEventListener('click', closeModal);
 btnSaveEdit.addEventListener('click', saveEdit);
-btnDelete.addEventListener('click', () => {
-    closeModal();
-    confirmDelete(filteredOccurrences.indexOf(currentOccurrence));
-});
+// Botão de deletar removido do modal de edição
 
 deleteModalClose.addEventListener('click', () => {
     deleteModal.classList.remove('active');
@@ -564,13 +623,17 @@ deleteModalClose.addEventListener('click', () => {
 btnCancelDelete.addEventListener('click', () => {
     deleteModal.classList.remove('active');
 });
-btnConfirmDelete.addEventListener('click', deleteOccurrence);
+btnConfirmDelete.addEventListener('click', executeDelete);
+
+printModalClose.addEventListener('click', closePrintModal);
+btnCancelPrint.addEventListener('click', closePrintModal);
+btnPrintTermoApreensao.addEventListener('click', printTermoApreensao);
 
 // Refresh button
 refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
     refreshBtn.disabled = true;
-
+    
     try {
         await loadOccurrences();
         // Pequeno delay para mostrar a animação
@@ -603,6 +666,12 @@ viewModal.addEventListener('click', (e) => {
 deleteModal.addEventListener('click', (e) => {
     if (e.target === deleteModal) {
         deleteModal.classList.remove('active');
+    }
+});
+
+printModal.addEventListener('click', (e) => {
+    if (e.target === printModal) {
+        closePrintModal();
     }
 });
 
@@ -651,30 +720,31 @@ function updateCharts() {
 function createLineChart() {
     const ctx = document.getElementById('lineChart');
     if (!ctx) return;
-
+    
     // Destroy existing chart
     if (lineChart) {
         lineChart.destroy();
     }
-
+    
     // Get last 30 days data
     const last30Days = [];
     const counts = [];
     const now = new Date();
-
+    
     for (let i = 29; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
         const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         last30Days.push(dateStr);
-
+        
         const count = allOccurrences.filter(occ => {
+            if (!occ.metadata?.dataRegistro) return false;
             const occDate = new Date(occ.metadata.dataRegistro);
             return occDate.toDateString() === date.toDateString();
         }).length;
         counts.push(count);
     }
-
+    
     lineChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -739,27 +809,27 @@ function createLineChart() {
 function createBarChart() {
     const ctx = document.getElementById('barChart');
     if (!ctx) return;
-
+    
     // Destroy existing chart
     if (barChart) {
         barChart.destroy();
     }
-
+    
     // Count by unit
     const unitCounts = {};
     allOccurrences.forEach(occ => {
-        const unit = occ.ocorrencia.unidade;
+        const unit = occ.ocorrencia?.unidade || 'Não especificado';
         unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
-
+    
     // Sort and get top 10
     const sortedUnits = Object.entries(unitCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
-
+    
     const labels = sortedUnits.map(([unit]) => unit);
     const data = sortedUnits.map(([, count]) => count);
-
+    
     barChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -820,27 +890,27 @@ function createBarChart() {
 function createDoughnutChart() {
     const ctx = document.getElementById('doughnutChart');
     if (!ctx) return;
-
+    
     // Destroy existing chart
     if (doughnutChart) {
         doughnutChart.destroy();
     }
-
+    
     // Count by item type
     const itemCounts = {};
     allOccurrences.forEach(occ => {
-        const item = occ.itemApreendido.item;
+        const item = occ.itemApreendido?.item || 'Não especificado';
         itemCounts[item] = (itemCounts[item] || 0) + 1;
     });
-
+    
     // Sort and get top 8
     const sortedItems = Object.entries(itemCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
-
+    
     const labels = sortedItems.map(([item]) => item);
     const data = sortedItems.map(([, count]) => count);
-
+    
     const colors = [
         '#071d49',
         '#279b4d',
@@ -851,7 +921,7 @@ function createDoughnutChart() {
         '#7b1fa2',
         '#00897b'
     ];
-
+    
     doughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -888,7 +958,7 @@ function createDoughnutChart() {
                     borderColor: '#fac709',
                     borderWidth: 1,
                     callbacks: {
-                        label: function (context) {
+                        label: function(context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -901,451 +971,3 @@ function createDoughnutChart() {
         }
     });
 }
-// Show label modal
-window.showLabel = function (index) {
-    const occurrence = filteredOccurrences[index];
-    if (!occurrence) return;
-
-    // Debug: verificar estrutura dos dados
-    console.log('Dados da ocorrência:', occurrence);
-    console.log('Item apreendido:', occurrence.itemApreendido);
-    console.log('Peso:', occurrence.itemApreendido?.peso);
-    console.log('Número de série:', occurrence.itemApreendido?.numeroSerie);
-    console.log('Valor:', occurrence.itemApreendido?.valor);
-
-    // Create label modal
-    const labelModal = document.createElement('div');
-    labelModal.className = 'modal label-modal';
-    labelModal.id = 'labelModal';
-
-    labelModal.innerHTML = `
-        <div class="modal-content label-modal-content">
-            <div class="modal-header">
-                <h2>Etiqueta de Apreensão</h2>
-                <button class="modal-close" onclick="closeLabelModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="label-container">
-                    <div class="label-header">
-                        <div class="label-logos">
-                            <img src="../../assets/PMDF_LetraPreta.png" alt="PMDF" class="label-logo-left">
-                            <div class="label-title">
-                                <div class="label-title-main">GOVERNO DO DISTRITO FEDERAL</div>
-                                <div class="label-title-sub">POLÍCIA MILITAR DO DISTRITO FEDERAL</div>
-                                <div class="label-title-sub">II COMANDO DE POLICIAMENTO</div>
-                                <div class="label-title-sub">REGIONAL OESTE</div>
-                            </div>
-                            <img src="../../assets/GDF_logo.jpg" alt="GDF" class="label-logo-right">
-                        </div>
-                    </div>
-                    
-                    <div class="label-content">
-                        <div class="label-row">
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">NÚMERO GÊNESIS</div>
-                                <div class="label-field-value">${occurrence.ocorrencia.numeroGenesis}</div>
-                            </div>
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">DATA DA APREENSÃO</div>
-                                <div class="label-field-value">${formatDateBR(occurrence.ocorrencia.dataApreensao)}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="label-row">
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">ITEM APREENDIDO</div>
-                                <div class="label-field-value">${occurrence.itemApreendido.item}</div>
-                            </div>
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">NOME DO ITEM</div>
-                                <div class="label-field-value">${occurrence.itemApreendido.descricao || occurrence.itemApreendido.item}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="label-row">
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">QUANTIDADE</div>
-                                <div class="label-field-value">${occurrence.itemApreendido.quantidade || '-'}</div>
-                            </div>
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">VALOR</div>
-                                <div class="label-field-value">${getValorValue(occurrence)}</div>
-                            </div>
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">PESO</div>
-                                <div class="label-field-value">${getPesoValue(occurrence)}</div>
-                            </div>
-                            <div class="label-field label-field-dark">
-                                <div class="label-field-title">N. DE SÉRIE</div>
-                                <div class="label-field-value">${getNumeroSerieValue(occurrence)}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeLabelModal()">Fechar</button>
-                <button class="btn-primary" onclick="printLabel()">Imprimir Etiqueta</button>
-                <button class="btn-primary" onclick="printTermo()">Termo de Apreensão</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(labelModal);
-    labelModal.style.display = 'flex';
-};
-
-// Close label modal
-window.closeLabelModal = function () {
-    const labelModal = document.getElementById('labelModal');
-    if (labelModal) {
-        labelModal.remove();
-    }
-};
-
-// Print label
-window.printLabel = function () {
-    const labelContent = document.querySelector('.label-container');
-    if (!labelContent) return;
-
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Etiqueta de Apreensão</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        margin: 20px; 
-                        background: white;
-                    }
-                    .label-container {
-                        border: 2px solid #000;
-                        padding: 20px;
-                        max-width: 800px;
-                        margin: 0 auto;
-                        background: white;
-                    }
-                    .label-header {
-                        margin-bottom: 20px;
-                    }
-                    .label-logos {
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        margin-bottom: 20px;
-                    }
-                    .label-logo-left, .label-logo-right {
-                        width: 80px;
-                        height: 80px;
-                        object-fit: contain;
-                    }
-                    .label-title {
-                        text-align: center;
-                        flex: 1;
-                        margin: 0 20px;
-                    }
-                    .label-title-main {
-                        font-size: 16px;
-                        font-weight: bold;
-                        margin-bottom: 5px;
-                    }
-                    .label-title-sub {
-                        font-size: 14px;
-                        font-weight: bold;
-                        margin-bottom: 2px;
-                    }
-                    .label-row {
-                        display: flex;
-                        margin-bottom: 10px;
-                        gap: 10px;
-                    }
-                    .label-field {
-                        flex: 1;
-                        border: 1px solid #000;
-                        min-height: 40px;
-                    }
-                    .label-field-title {
-                        background: #000;
-                        color: white;
-                        padding: 5px 10px;
-                        font-size: 12px;
-                        font-weight: bold;
-                        text-align: center;
-                    }
-                    .label-field-value {
-                        padding: 10px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        text-align: center;
-                        min-height: 20px;
-                    }
-                    @media print {
-                        body { margin: 0; }
-                        .label-container { border: 2px solid #000; }
-                    }
-                </style>
-            </head>
-            <body>
-                ${labelContent.outerHTML}
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-};
-
-// Print termo de apreensão
-window.printTermo = function () {
-    const labelModal = document.getElementById('labelModal');
-    if (!labelModal) return;
-
-    // Buscar dados da ocorrência atual
-    const occurrence = filteredOccurrences.find(occ =>
-        occ.ocorrencia.numeroGenesis === document.querySelector('.label-field-value').textContent
-    );
-
-    if (!occurrence) return;
-
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Termo de Apreensão</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        margin: 20px; 
-                        background: white;
-                        font-size: 12px;
-                    }
-                    .termo-container {
-                        max-width: 800px;
-                        margin: 0 auto;
-                        background: white;
-                        padding: 20px;
-                    }
-                    .termo-header {
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        margin-bottom: 30px;
-                    }
-                    .termo-logo-left, .termo-logo-right {
-                        width: 80px;
-                        height: 80px;
-                        object-fit: contain;
-                    }
-                    .termo-title-section {
-                        text-align: center;
-                        flex: 1;
-                        margin: 0 20px;
-                    }
-                    .termo-title-main {
-                        font-size: 14px;
-                        font-weight: bold;
-                        margin-bottom: 3px;
-                    }
-                    .termo-title-sub {
-                        font-size: 12px;
-                        font-weight: bold;
-                        margin-bottom: 2px;
-                    }
-                    .termo-main-title {
-                        text-align: center;
-                        font-size: 18px;
-                        font-weight: bold;
-                        margin: 30px 0;
-                    }
-                    .codigo-objeto {
-                        border: 2px solid #000;
-                        padding: 5px;
-                        margin-bottom: 20px;
-                        display: inline-block;
-                    }
-                    .codigo-label {
-                        background: #000;
-                        color: white;
-                        padding: 3px 8px;
-                        font-size: 10px;
-                        font-weight: bold;
-                        margin-bottom: 5px;
-                    }
-                    .codigo-value {
-                        padding: 5px;
-                        min-height: 20px;
-                        border: 1px solid #000;
-                        margin-top: 5px;
-                    }
-                    .section-title {
-                        font-size: 14px;
-                        font-weight: bold;
-                        margin: 20px 0 10px 0;
-                    }
-                    .form-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 20px;
-                    }
-                    .form-table td {
-                        border: 1px solid #000;
-                        padding: 5px;
-                        vertical-align: top;
-                    }
-                    .field-header {
-                        background: #000;
-                        color: white;
-                        font-weight: bold;
-                        text-align: center;
-                        font-size: 10px;
-                        padding: 3px;
-                    }
-                    .field-value {
-                        min-height: 25px;
-                        padding: 5px;
-                        font-size: 11px;
-                    }
-                    .description-field {
-                        min-height: 80px;
-                    }
-                    .signature-section {
-                        text-align: center;
-                        margin-top: 40px;
-                    }
-                    .signature-line {
-                        border-bottom: 1px solid #000;
-                        width: 300px;
-                        margin: 30px auto 10px auto;
-                    }
-                    .footer-text {
-                        text-align: center;
-                        font-size: 10px;
-                        margin-top: 40px;
-                        font-style: italic;
-                    }
-                    @media print {
-                        body { margin: 0; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="termo-container">
-                    <div class="termo-header">
-                        <img src="../../assets/PMDF_LetraPreta.png" alt="PMDF" class="termo-logo-left">
-                        <div class="termo-title-section">
-                            <div class="termo-title-main">GOVERNO DO DISTRITO FEDERAL</div>
-                            <div class="termo-title-sub">POLÍCIA MILITAR DO DISTRITO FEDERAL</div>
-                        </div>
-                        <img src="../../assets/GDF_logo.jpg" alt="GDF" class="termo-logo-right">
-                    </div>
-                    
-                    <div class="termo-main-title">TERMO DE APREENSÃO</div>
-                    
-                    <div class="codigo-objeto">
-                        <div class="codigo-label">CÓDIGO DO OBJETO</div>
-                        <div class="codigo-value">${occurrence.ocorrencia.numeroGenesis}</div>
-                    </div>
-                    
-                    <div class="section-title">DADOS GERAIS DA OCORRÊNCIA</div>
-                    <table class="form-table">
-                        <tr>
-                            <td style="width: 20%;">
-                                <div class="field-header">NÚMERO GÊNESIS</div>
-                                <div class="field-value">${occurrence.ocorrencia.numeroGenesis}</div>
-                            </td>
-                            <td style="width: 20%;">
-                                <div class="field-header">NÚMERO CIADE</div>
-                                <div class="field-value">-</div>
-                            </td>
-                            <td style="width: 20%;">
-                                <div class="field-header">DATA DA APREENSÃO</div>
-                                <div class="field-value">${formatDateBR(occurrence.ocorrencia.dataApreensao)}</div>
-                            </td>
-                            <td style="width: 20%;">
-                                <div class="field-header">UNIDADE</div>
-                                <div class="field-value">${occurrence.ocorrencia.unidade}</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="width: 30%;">
-                                <div class="field-header">FUNDAMENTAÇÃO LEGAL</div>
-                                <div class="field-value">${occurrence.ocorrencia.leiInfrigida}</div>
-                            </td>
-                            <td style="width: 15%;">
-                                <div class="field-header">ARTIGO</div>
-                                <div class="field-value">${occurrence.ocorrencia.artigo}</div>
-                            </td>
-                            <td style="width: 35%;">
-                                <div class="field-header">POLICIAL RESPONSÁVEL PELA APREENSÃO</div>
-                                <div class="field-value">${occurrence.policial.nome}</div>
-                            </td>
-                            <td style="width: 20%;">
-                                <div class="field-header">MATRÍCULA</div>
-                                <div class="field-value">${occurrence.policial.matricula}</div>
-                            </td>
-                        </tr>
-                    </table>
-                    
-                    <div class="section-title">DADOS DO BEM APREENDIDO</div>
-                    <table class="form-table">
-                        <tr>
-                            <td style="width: 25%;">
-                                <div class="field-header">ITEM APREENDIDO</div>
-                                <div class="field-value">${occurrence.itemApreendido.item}</div>
-                            </td>
-                            <td style="width: 25%;">
-                                <div class="field-header">NOME DO ITEM</div>
-                                <div class="field-value">${occurrence.itemApreendido.descricao || occurrence.itemApreendido.item}</div>
-                            </td>
-                            <td style="width: 25%;">
-                                <div class="field-header">VALOR</div>
-                                <div class="field-value">${getValorValue(occurrence)}</div>
-                            </td>
-                            <td style="width: 25%;">
-                                <div class="field-header">QUANTIDADE</div>
-                                <div class="field-value">${occurrence.itemApreendido.quantidade || '-'}</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="width: 25%;">
-                                <div class="field-header">PESO</div>
-                                <div class="field-value">${getPesoValue(occurrence)}</div>
-                            </td>
-                            <td style="width: 50%;">
-                                <div class="field-header">NÚMERO DE SÉRIE</div>
-                                <div class="field-value">${getNumeroSerieValue(occurrence)}</div>
-                            </td>
-                            <td style="width: 25%;">
-                                <div class="field-header">ESTADO DO BEM</div>
-                                <div class="field-value">-</div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="4">
-                                <div class="field-header">DESCRIÇÃO DO OBJETO</div>
-                                <div class="field-value description-field">${occurrence.itemApreendido.descricao || ''}</div>
-                            </td>
-                        </tr>
-                    </table>
-                    
-                    <div class="signature-section">
-                        <div>Chefe da Seção de Crimes de Menor Potencial</div>
-                        <div>Ofensivo (SECRIMPO) -</div>
-                        <div class="signature-line"></div>
-                    </div>
-                    
-                    <div class="footer-text">
-                        Brasília - "Patrimônio cultural da humanidade"
-                    </div>
-                </div>
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-};

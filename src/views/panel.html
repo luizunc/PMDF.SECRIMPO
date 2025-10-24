@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SECRIMPO PMDF - REGISTROS</title>
     <link rel="stylesheet" href="../styles/panel.css">
+    <link rel="stylesheet" href="../styles/loading.css">
+    <link rel="stylesheet" href="../styles/custom-alert.css">
 </head>
-
 <body>
     <div class="app-container">
         <!-- Header -->
@@ -25,26 +25,25 @@
                 <div class="user-menu-container">
                     <button class="user-menu-button" id="userMenuBtn">
                         <svg class="user-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none" />
-                            <circle cx="12" cy="9" r="3.5" fill="currentColor" />
-                            <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor" />
+                            <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
+                            <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor"/>
                         </svg>
                     </button>
                     <div class="user-dropdown" id="userDropdown">
                         <div class="dropdown-header">
                             <svg class="dropdown-user-icon" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none" />
-                                <circle cx="12" cy="9" r="3.5" fill="currentColor" />
+                                <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
                             </svg>
                             <span class="user-info" id="userInfo">Usuário conectado</span>
                         </div>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" id="logoutBtn">
-                            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
+                            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
                             </svg>
                             <span>Sair</span>
                         </button>
@@ -57,17 +56,17 @@
         <nav class="nav-tabs">
             <button class="nav-tab" id="tabDashboard">
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
                 </svg>
                 Controle de Ocorrências
             </button>
             <button class="nav-tab active" id="tabNovaOcorrencia">
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 Nova Ocorrência
             </button>
@@ -76,7 +75,7 @@
         <!-- Main Content -->
         <main class="main-content">
             <form id="occurrenceForm" class="occurrence-form">
-
+                
                 <!-- Seção Ocorrência -->
                 <section class="form-section">
                     <h2 class="section-title">
@@ -89,12 +88,16 @@
                         </div>
                         <div class="form-group">
                             <label for="unidade">Unidade</label>
-                            <input type="text" id="unidade" name="unidade" required>
+                            <select id="unidade" name="unidade" required>
+                                <option value="">Selecione...</option>
+                                <option value="8º BPM">8º BPM</option>
+                                <option value="10º BPM">10º BPM</option>
+                                <option value="16º BPM">16º BPM</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="dataApreensao">Data da Apreensão</label>
-                            <input type="text" id="dataApreensao" name="dataApreensao" placeholder="dd/mm/aaaa"
-                                maxlength="10" required>
+                            <input type="text" id="dataApreensao" name="dataApreensao" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="leiInfrigida">Lei Infringida</label>
@@ -141,12 +144,6 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group" id="pesoGroup" style="display: none;">
-                            <label for="peso">Peso</label>
-                            <input type="text" id="peso" name="peso" placeholder="Digite o peso">
-                            <small class="field-help">Este campo aparece quando você seleciona uma unidade de peso (mg,
-                                g, kg, t)</small>
-                        </div>
                         <div class="form-group full-width">
                             <label for="descricaoItem">Descrição</label>
                             <textarea id="descricaoItem" name="descricaoItem" rows="3"></textarea>
@@ -163,14 +160,6 @@
                             <label for="policialItem">Policial</label>
                             <input type="text" id="policialItem" name="policialItem">
                         </div>
-                        <div class="form-group">
-                            <label for="valorItem">Valor (R$)</label>
-                            <input type="text" id="valorItem" name="valorItem" placeholder="Ex: 1.500,00">
-                        </div>
-                        <div class="form-group">
-                            <label for="numeroSerie">Número de Série</label>
-                            <input type="text" id="numeroSerie" name="numeroSerie">
-                        </div>
                     </div>
                 </section>
 
@@ -186,8 +175,7 @@
                         </div>
                         <div class="form-group">
                             <label for="dataNascimento">Data de Nascimento</label>
-                            <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa"
-                                maxlength="10" required>
+                            <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="tipoDocumento">Tipo de Documento</label>
@@ -260,7 +248,16 @@
         </main>
     </div>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">Processando</div>
+            <div class="loading-subtext" id="loadingSubtext">Aguarde um momento</div>
+        </div>
+    </div>
+
+    <script src="../scripts/custom-alert.js"></script>
     <script src="../scripts/panel.js"></script>
 </body>
-
 </html>
