@@ -243,7 +243,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     console.log('✓ JSON salvo em:', jsonFilepath);
     
     // Enviar para Google Sheets (se configurado)
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec"; // Cole sua URL do Google Apps Script aqui
+    const GOOGLE_SHEETS_URL = "LINK DO SHEETS"; // Cole sua URL do Google Apps Script aqui
     
     if (GOOGLE_SHEETS_URL) {
       try {
@@ -367,7 +367,7 @@ ipcMain.on('load-dashboard', () => {
 // IPC Handler para obter todas as ocorrências do Google Sheets
 ipcMain.handle('get-occurrences', async (event) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
+    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
     
     if (!GOOGLE_SHEETS_URL) {
       console.log('Google Sheets URL não configurada, retornando dados locais');
@@ -433,7 +433,7 @@ ipcMain.handle('get-occurrences', async (event) => {
 // IPC Handler para atualizar ocorrência (APENAS Google Sheets)
 ipcMain.handle('update-occurrence', async (event, data) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
+    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
@@ -560,7 +560,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
 // IPC Handler para excluir ocorrência (APENAS Google Sheets)
 ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
   try {
-    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
+    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };

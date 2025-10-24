@@ -12,9 +12,9 @@ from pathlib import Path
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
 # Configurações KeyAuth
-KEYAUTH_NAME = "SECRIMPO"
-KEYAUTH_OWNERID = "4Roety0GwG"
-KEYAUTH_VERSION = "1.0"
+KEYAUTH_NAME = "NOME APLICAÇÃO"
+KEYAUTH_OWNERID = "OWNER APLICAÇÃO"
+KEYAUTH_VERSION = "VERSÃO APLICAÇÃO"
 
 # Importar KeyAuth oficial
 try:
@@ -27,7 +27,7 @@ except ImportError:
     sys.exit(1)
 
 # Validar configurações
-if KEYAUTH_NAME == "seu_app_name_aqui" or KEYAUTH_OWNERID == "seu_owner_id_aqui":
+if KEYAUTH_NAME == "NOME APLICAÇÃO" or KEYAUTH_OWNERID == "OWNER APLICAÇÃO":
     print(json.dumps({
         "success": False,
         "message": "ERRO: Configure KEYAUTH_NAME e KEYAUTH_OWNERID no arquivo auth_wrapper.py antes de compilar!"
