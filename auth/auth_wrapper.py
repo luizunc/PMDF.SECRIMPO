@@ -11,10 +11,20 @@ from pathlib import Path
 # Configurar stdout para modo unbuffered (importante para executáveis PyInstaller)
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
-# Configurações KeyAuth
-KEYAUTH_NAME = "NOME APLICAÇÃO"
-KEYAUTH_OWNERID = "OWNER APLICAÇÃO"
-KEYAUTH_VERSION = "VERSÃO APLICAÇÃO"
+# Configurações KeyAuth - carregadas do .env
+try:
+    from dotenv import load_dotenv
+    # Carregar variáveis do .env
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    # Se python-dotenv não estiver disponível, usar valores padrão
+    pass
+
+KEYAUTH_NAME = os.getenv('KEYAUTH_NAME', 'SECRIMPO')
+KEYAUTH_OWNERID = os.getenv('KEYAUTH_OWNERID', 'iqvgrWhiYz')
+KEYAUTH_VERSION = os.getenv('KEYAUTH_VERSION', '1.0')
 
 # Importar KeyAuth oficial
 try:
@@ -27,10 +37,10 @@ except ImportError:
     sys.exit(1)
 
 # Validar configurações
-if KEYAUTH_NAME == "NOME APLICAÇÃO" or KEYAUTH_OWNERID == "OWNER APLICAÇÃO":
+if not KEYAUTH_NAME or not KEYAUTH_OWNERID or KEYAUTH_NAME == "NOME APLICAÇÃO" or KEYAUTH_OWNERID == "OWNER APLICAÇÃO":
     print(json.dumps({
         "success": False,
-        "message": "ERRO: Configure KEYAUTH_NAME e KEYAUTH_OWNERID no arquivo auth_wrapper.py antes de compilar!"
+        "message": "ERRO: Configure KEYAUTH_NAME e KEYAUTH_OWNERID no arquivo .env antes de compilar!"
     }))
     sys.exit(1)
 

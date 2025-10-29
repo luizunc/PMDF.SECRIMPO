@@ -378,7 +378,7 @@ body {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(39, 155, 77, 0.4);
+    box-shadow: 0 6px 20px #fac709;
 }
 
 .btn-primary:disabled {
@@ -480,4 +480,316 @@ body {
     .btn-secondary {
         width: 100%;
     }
+}
+/* ===== CALENDÁRIO POPUP ===== */
+
+/* Container do input com calendário */
+.date-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.date-input-container input {
+    flex: 1;
+    padding-right: 50px !important;
+    background-image: linear-gradient(45deg, transparent 40%, rgba(7, 29, 73, 0.05) 50%, transparent 60%);
+    background-size: 20px 20px;
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}
+
+.date-input-container input:focus {
+    background-image: none;
+    box-shadow: 0 0 0 3px rgba(7, 29, 73, 0.1);
+}
+
+.date-input-container input::placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+/* Botão do calendário */
+.calendar-btn {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    color: #666;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.calendar-btn:hover {
+    background: #f0f2f5;
+    color: #071d49;
+    transform: scale(1.1);
+}
+
+.calendar-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Overlay do calendário */
+.calendar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(3px);
+}
+
+.calendar-overlay.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+/* Container principal do calendário */
+.calendar-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    padding: 24px;
+    width: 350px;
+    max-width: 95vw;
+    animation: slideIn 0.3s ease;
+    border: 1px solid #e0e0e0;
+}
+
+/* Cabeçalho do calendário */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f2f5;
+}
+
+.calendar-nav {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.calendar-nav:hover {
+    background: #e3f2fd;
+    color: #1976d2;
+    transform: scale(1.1);
+}
+
+.calendar-nav svg {
+    width: 22px;
+    height: 22px;
+}
+
+.calendar-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #071d49;
+    text-align: center;
+    min-width: 150px;
+}
+
+/* Dias da semana */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.weekday {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    padding: 10px 4px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+/* Grade de dias */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 20px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    position: relative;
+}
+
+.calendar-day:hover {
+    background: #e3f2fd;
+    color: #1976d2;
+    transform: scale(1.1);
+}
+
+.calendar-day.other-month {
+    color: #ccc;
+    opacity: 0.5;
+}
+
+.calendar-day.other-month:hover {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.calendar-day.today {
+    background: linear-gradient(135deg, #fac709 0%, #f9b000 100%);
+    color: white;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(250, 199, 9, 0.4);
+}
+
+.calendar-day.today:hover {
+    background: linear-gradient(135deg, #f9b000 0%, #e6a000 100%);
+    transform: scale(1.15);
+}
+
+.calendar-day.selected {
+    background: linear-gradient(135deg, #071d49 0%, #0a2a6b 100%);
+    color: white;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(7, 29, 73, 0.4);
+}
+
+.calendar-day.selected:hover {
+    background: linear-gradient(135deg, #0a2a6b 0%, #0d3380 100%);
+    transform: scale(1.15);
+}
+
+/* Rodapé do calendário */
+.calendar-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 15px;
+    border-top: 2px solid #f0f2f5;
+}
+
+.calendar-btn-cancel,
+.calendar-btn-today {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.calendar-btn-cancel:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.calendar-btn-today:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 155, 77, 0.4);
+}
+
+/* Animações */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-30px) scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .calendar-container {
+        width: 320px;
+        padding: 20px;
+    }
+    
+    .calendar-title {
+        font-size: 16px;
+        min-width: 120px;
+    }
+    
+    .calendar-day {
+        font-size: 13px;
+    }
+    
+    .weekday {
+        font-size: 12px;
+        padding: 8px 2px;
+    }
+    
+    .calendar-footer {
+        flex-direction: column;
+    }
+    
+    .calendar-btn-cancel,
+    .calendar-btn-today {
+        width: 100%;
+    }
+}/* Dic
+as visuais para campos de data */
+.date-input-container {
+    position: relative;
+}
+
+/* Dicas removidas para interface mais limpa */
+
+/* Melhorar feedback visual durante digitação */
+.date-input-container input:valid {
+    border-color: #279b4d;
+    background-color: rgba(39, 155, 77, 0.05);
+}
+
+.date-input-container input:invalid:not(:placeholder-shown) {
+    border-color: #c33;
+    background-color: rgba(204, 51, 51, 0.05);
+}
+
+/* Animação de sucesso quando data é válida */
+@keyframes dateSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.date-input-container input.date-valid {
+    animation: dateSuccess 0.3s ease;
 }

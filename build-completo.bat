@@ -41,11 +41,17 @@ if errorlevel 1 (
 
 echo.
 echo [3/5] Instalando PyInstaller...
-pip install pyinstaller
+python -m pip install --upgrade pip
+python -m pip install pyinstaller
 if errorlevel 1 (
     echo [ERRO] Falha ao instalar PyInstaller
-    pause
-    exit /b 1
+    echo Tentando instalacao alternativa...
+    pip install pyinstaller --user
+    if errorlevel 1 (
+        echo [ERRO] Falha ao instalar PyInstaller mesmo com --user
+        pause
+        exit /b 1
+    )
 )
 
 echo.
@@ -57,7 +63,14 @@ if not exist "dist" mkdir dist
 if not exist "..\build" mkdir ..\build
 
 REM Compilar com PyInstaller (modo noconsole para producao - sem janelas extras)
+echo Tentando compilar com pyinstaller...
 pyinstaller --onefile --noconsole --name auth_keyauth --distpath dist --workpath ..\build --specpath ..\build --add-data "keyauth.py;." --hidden-import=win32security --hidden-import=requests --collect-all pywin32 --collect-all requests auth_wrapper.py
+
+REM Se falhar, tentar com python -m
+if errorlevel 1 (
+    echo Tentando com python -m pyinstaller...
+    python -m PyInstaller --onefile --noconsole --name auth_keyauth --distpath dist --workpath ..\build --specpath ..\build --add-data "keyauth.py;." --hidden-import=win32security --hidden-import=requests --collect-all pywin32 --collect-all requests auth_wrapper.py
+)
 
 cd ..
 if errorlevel 1 (
