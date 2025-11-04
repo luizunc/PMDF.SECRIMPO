@@ -3,6 +3,7 @@ const { ipcRenderer } = require('electron');
 const loginForm = document.getElementById('loginForm');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
+const rememberUserCheckbox = document.getElementById('rememberUser');
 const loginBtn = document.getElementById('loginBtn');
 const errorMessage = document.getElementById('errorMessage');
 
@@ -11,6 +12,7 @@ loginForm.addEventListener('submit', async (e) => {
     
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
+    const rememberUser = rememberUserCheckbox.checked;
     
     if (!username || !password) {
         showError('Por favor, preencha todos os campos');
@@ -30,6 +32,13 @@ loginForm.addEventListener('submit', async (e) => {
             sessionStorage.setItem('username', username);
             if (result.userData) {
                 sessionStorage.setItem('userData', JSON.stringify(result.userData));
+            }
+            
+            // Salvar ou remover usuário do localStorage
+            if (rememberUser) {
+                localStorage.setItem('rememberedUser', username);
+            } else {
+                localStorage.removeItem('rememberedUser');
             }
             
             // Carregar dashboard
@@ -72,9 +81,18 @@ function hideError() {
     errorMessage.style.display = 'none';
 }
 
-// Limpar campos ao carregar
+// Carregar usuário salvo ao iniciar
 window.addEventListener('load', () => {
-    usernameInput.value = '';
-    passwordInput.value = '';
-    usernameInput.focus();
+    const rememberedUser = localStorage.getItem('rememberedUser');
+    
+    if (rememberedUser) {
+        usernameInput.value = rememberedUser;
+        rememberUserCheckbox.checked = true;
+        passwordInput.focus(); // Focar na senha se usuário já está preenchido
+    } else {
+        usernameInput.value = '';
+        passwordInput.value = '';
+        rememberUserCheckbox.checked = false;
+        usernameInput.focus();
+    }
 });

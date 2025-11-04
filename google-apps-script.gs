@@ -12,7 +12,7 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    const dataRange = sheet.getRange(3, 1, lastRow - 2, 24); // A3 até X (24 colunas a partir da coluna A)
+    const dataRange = sheet.getRange(3, 1, lastRow - 2, 20); // A3 até T (20 colunas a partir da coluna A)
     const values = dataRange.getValues();
     
     const occurrences = values.map(row => ({
@@ -22,24 +22,20 @@ function doGet(e) {
       dataApreensao: row[3],
       leiInfrigida: row[4],
       artigo: row[5],
-      policialCondutor: row[6],
-      especie: row[7],
-      item: row[8],
-      quantidade: row[9],
-      unidadeMedida: row[10],
-      descricaoItem: row[11],
-      ocorrenciaItem: row[12],
-      proprietarioItem: row[13],
-      policialItem: row[14],
-      nomeProprietario: row[15],
-      dataNascimento: row[16],
-      tipoDocumento: row[17],
-      numeroDocumento: row[18],
-      nomePolicial: row[19],
-      matricula: row[20],
-      graduacao: row[21],
-      unidadePolicial: row[22],
-      registradoPor: row[23]
+      especie: row[6],
+      item: row[7],
+      quantidade: row[8],
+      unidadeMedida: row[9],
+      descricaoItem: row[10],
+      nomeProprietario: row[11],
+      dataNascimento: row[12],
+      tipoDocumento: row[13],
+      numeroDocumento: row[14],
+      nomePolicial: row[15],
+      matricula: row[16],
+      graduacao: row[17],
+      unidadePolicial: row[18],
+      registradoPor: row[19]
     }));
     
     return ContentService.createTextOutput(JSON.stringify({
@@ -62,29 +58,35 @@ function doPost(e) {
     
     // Se for uma ação de atualização
     if (data.action === 'update') {
-      const numeroGenesis = data.numeroGenesis;
+      // Usar numeroGenesisOriginal para buscar a linha (número antes da edição)
+      // Se não existir, usar numeroGenesis (caso não tenha sido editado)
+      const numeroParaBusca = data.numeroGenesisOriginal || data.numeroGenesis;
+      const numeroGenesisNovo = data.numeroGenesis;
       const lastRow = sheet.getLastRow();
+      
+      // Log para debug
+      Logger.log('Buscando por número Genesis: ' + numeroParaBusca);
+      Logger.log('Novo número Genesis: ' + numeroGenesisNovo);
       
       // Procurar a linha com o número Genesis correspondente (coluna B = índice 2)
       for (let i = 3; i <= lastRow; i++) {
-        if (sheet.getRange(i, 2).getValue() == numeroGenesis) {
+        const valorCelula = sheet.getRange(i, 2).getValue();
+        if (valorCelula == numeroParaBusca) {
+          Logger.log('Linha encontrada: ' + i);
+          
           // Atualizar a linha encontrada (a partir da coluna A = índice 1)
-          sheet.getRange(i, 1, 1, 24).setValues([[
+          sheet.getRange(i, 1, 1, 20).setValues([[
             data.timestamp,
-            data.numeroGenesis,
+            numeroGenesisNovo,  // Usar o novo número Genesis
             data.unidade,
             data.dataApreensao,
             data.leiInfrigida,
             data.artigo,
-            data.policialCondutor,
             data.especie,
             data.item,
             data.quantidade,
             data.unidadeMedida,
             data.descricaoItem,
-            data.ocorrenciaItem,
-            data.proprietarioItem,
-            data.policialItem,
             data.nomeProprietario,
             data.dataNascimento,
             data.tipoDocumento,
@@ -102,6 +104,8 @@ function doPost(e) {
           })).setMimeType(ContentService.MimeType.JSON);
         }
       }
+      
+      Logger.log('Ocorrência não encontrada. Número buscado: ' + numeroParaBusca);
       
       return ContentService.createTextOutput(JSON.stringify({
         success: false,

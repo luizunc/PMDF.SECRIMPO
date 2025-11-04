@@ -24,12 +24,8 @@ window.addEventListener('load', () => {
         userInfo.textContent = `${username}`;
     }
     
-    // Definir data atual como padrão no formato brasileiro
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-    document.getElementById('dataApreensao').value = `${day}/${month}/${year}`;
+    // Inicializar calendários Flatpickr
+    initializeDatePickers();
 });
 
 // Submit do formulário
@@ -57,18 +53,14 @@ occurrenceForm.addEventListener('submit', async (e) => {
             unidade: document.getElementById('unidade').value,
             dataApreensao: brDateToISO(dataApreensao),
             leiInfrigida: document.getElementById('leiInfrigida').value,
-            artigo: document.getElementById('artigo').value,
-            policialCondutor: document.getElementById('policialCondutor').value
+            artigo: document.getElementById('artigo').value
         },
         itemApreendido: {
             especie: document.getElementById('especie').value,
             item: document.getElementById('item').value,
             quantidade: document.getElementById('quantidade').value,
             unidadeMedida: document.getElementById('unidadeMedida').value,
-            descricao: document.getElementById('descricaoItem').value,
-            ocorrencia: document.getElementById('ocorrenciaItem').value,
-            proprietario: document.getElementById('proprietarioItem').value,
-            policial: document.getElementById('policialItem').value
+            descricao: document.getElementById('descricaoItem').value
         },
         proprietario: {
             nome: document.getElementById('nomeProprietario').value,
@@ -184,12 +176,8 @@ function clearForm() {
     hideMessages();
     hideLoading();
     
-    // Redefinir data atual no formato brasileiro
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-    document.getElementById('dataApreensao').value = `${day}/${month}/${year}`;
+    // Reinicializar calendários com data atual
+    initializeDatePickers();
     
     // Focar no primeiro campo
     document.getElementById('numeroGenesis').focus();
@@ -235,98 +223,10 @@ function brDateToISO(brDate) {
     return `${year}-${month}-${day}`;
 }
 
-// Aplicar máscaras nos campos de data
-document.getElementById('dataApreensao').addEventListener('input', applyDateMask);
-document.getElementById('dataNascimento').addEventListener('input', applyDateMask);
-
-// Melhorar experiência de digitação - permitir navegação rápida
-document.getElementById('dataApreensao').addEventListener('keydown', handleDateKeydown);
-document.getElementById('dataNascimento').addEventListener('keydown', handleDateKeydown);
-
-// Função para melhorar navegação por teclado nos campos de data
-function handleDateKeydown(e) {
-    const input = e.target;
-    
-    // Permitir teclas de navegação e edição
-    const allowedKeys = [
-        'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
-        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-        'Home', 'End'
-    ];
-    
-    if (allowedKeys.includes(e.key)) {
-        return;
-    }
-    
-    // Permitir Ctrl+A, Ctrl+C, Ctrl+V, etc.
-    if (e.ctrlKey || e.metaKey) {
-        return;
-    }
-    
-    // Permitir apenas números
-    if (!/^\d$/.test(e.key)) {
-        e.preventDefault();
-        return;
-    }
-    
-    // Auto-avançar para próximo campo quando completar a data
-    setTimeout(() => {
-        if (input.value.length === 10 && isValidDate(input.value)) {
-            // Mover para próximo campo
-            const form = input.closest('form');
-            const inputs = Array.from(form.querySelectorAll('input, select, textarea'));
-            const currentIndex = inputs.indexOf(input);
-            if (currentIndex < inputs.length - 1) {
-                inputs[currentIndex + 1].focus();
-            }
-        }
-    }, 10);
+// Função vazia para manter compatibilidade
+function initializeDatePickers() {
+    // Calendário removido
 }
-
-// Validação ao sair do campo de data
-document.getElementById('dataApreensao').addEventListener('blur', function(e) {
-    if (e.target.value && !isValidDate(e.target.value)) {
-        showError('Data de apreensão inválida. Use o formato dd/mm/aaaa');
-        e.target.classList.remove('date-valid');
-        e.target.focus();
-    } else {
-        hideMessages();
-        if (e.target.value && isValidDate(e.target.value)) {
-            e.target.classList.add('date-valid');
-            setTimeout(() => e.target.classList.remove('date-valid'), 300);
-        }
-    }
-});
-
-// Feedback visual em tempo real para data de apreensão
-document.getElementById('dataApreensao').addEventListener('input', function(e) {
-    if (e.target.value.length === 10 && isValidDate(e.target.value)) {
-        e.target.classList.add('date-valid');
-        setTimeout(() => e.target.classList.remove('date-valid'), 300);
-    }
-});
-
-document.getElementById('dataNascimento').addEventListener('blur', function(e) {
-    if (e.target.value && !isValidDate(e.target.value)) {
-        showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
-        e.target.classList.remove('date-valid');
-        e.target.focus();
-    } else {
-        hideMessages();
-        if (e.target.value && isValidDate(e.target.value)) {
-            e.target.classList.add('date-valid');
-            setTimeout(() => e.target.classList.remove('date-valid'), 300);
-        }
-    }
-});
-
-// Feedback visual em tempo real para data de nascimento
-document.getElementById('dataNascimento').addEventListener('input', function(e) {
-    if (e.target.value.length === 10 && isValidDate(e.target.value)) {
-        e.target.classList.add('date-valid');
-        setTimeout(() => e.target.classList.remove('date-valid'), 300);
-    }
-});
 
 // Função para formatar CPF: 000.000.000-00
 function formatCPF(value) {
@@ -410,265 +310,233 @@ tabDashboard.addEventListener('click', () => {
     ipcRenderer.send('load-dashboard');
 });
 
-// ===== CALENDÁRIO POPUP =====
+// ==================== FUNCIONALIDADE DE PREENCHIMENTO POR ARQUIVO ====================
 
-class CalendarPopup {
-    constructor() {
-        this.currentDate = new Date();
-        this.selectedDate = null;
-        this.targetInput = null;
-        
-        // Elementos do DOM
-        this.overlay = document.getElementById('calendarOverlay');
-        this.title = document.getElementById('calendarTitle');
-        this.daysContainer = document.getElementById('calendarDays');
-        this.prevBtn = document.getElementById('prevMonth');
-        this.nextBtn = document.getElementById('nextMonth');
-        this.cancelBtn = document.getElementById('calendarCancel');
-        this.todayBtn = document.getElementById('calendarToday');
-        
-        // Nomes dos meses
-        this.months = [
-            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-        ];
-        
-        this.init();
-    }
-    
-    init() {
-        // Event listeners
-        this.prevBtn.addEventListener('click', () => this.previousMonth());
-        this.nextBtn.addEventListener('click', () => this.nextMonth());
-        this.cancelBtn.addEventListener('click', () => this.close());
-        this.todayBtn.addEventListener('click', () => this.selectToday());
-        
-        // Fechar ao clicar fora do calendário
-        this.overlay.addEventListener('click', (e) => {
-            if (e.target === this.overlay) {
-                this.close();
-            }
-        });
-        
-        // Fechar com ESC
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.overlay.classList.contains('active')) {
-                this.close();
-            }
-        });
-    }
-    
-    show(inputElement) {
-        this.targetInput = inputElement;
-        
-        // Se o input já tem uma data válida, usar como data inicial
-        const inputValue = inputElement.value;
-        if (inputValue && this.isValidBRDate(inputValue)) {
-            const [day, month, year] = inputValue.split('/');
-            this.currentDate = new Date(year, month - 1, day);
-            this.selectedDate = new Date(this.currentDate);
-        } else {
-            // Usar data atual como padrão
-            this.currentDate = new Date();
-            this.selectedDate = null;
-        }
-        
-        this.render();
-        this.overlay.classList.add('active');
-        
-        // Focar no calendário para navegação por teclado
-        setTimeout(() => {
-            this.overlay.focus();
-        }, 100);
-    }
-    
-    // Método para sincronizar calendário com input digitado
-    syncWithInput(inputElement) {
-        const inputValue = inputElement.value;
-        if (inputValue && this.isValidBRDate(inputValue)) {
-            const [day, month, year] = inputValue.split('/');
-            this.currentDate = new Date(year, month - 1, day);
-            this.selectedDate = new Date(this.currentDate);
-            
-            // Se o calendário estiver aberto, atualizar
-            if (this.overlay.classList.contains('active') && this.targetInput === inputElement) {
-                this.render();
-            }
-        }
-    }
-    
-    close() {
-        this.overlay.classList.remove('active');
-        this.targetInput = null;
-        this.selectedDate = null;
-        
-        // Retornar foco para o input
-        if (this.targetInput) {
-            this.targetInput.focus();
-        }
-    }
-    
-    previousMonth() {
-        this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-        this.render();
-    }
-    
-    nextMonth() {
-        this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-        this.render();
-    }
-    
-    selectToday() {
-        const today = new Date();
-        this.selectDate(today);
-    }
-    
-    selectDate(date) {
-        this.selectedDate = new Date(date);
-        
-        // Formatar data no padrão brasileiro (dd/mm/yyyy)
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        
-        if (this.targetInput) {
-            this.targetInput.value = `${day}/${month}/${year}`;
-            
-            // Disparar eventos para validação
-            const inputEvent = new Event('input', { bubbles: true });
-            const changeEvent = new Event('change', { bubbles: true });
-            this.targetInput.dispatchEvent(inputEvent);
-            this.targetInput.dispatchEvent(changeEvent);
-        }
-        
-        this.close();
-    }
-    
-    render() {
-        // Atualizar título
-        this.title.textContent = `${this.months[this.currentDate.getMonth()]} ${this.currentDate.getFullYear()}`;
-        
-        // Limpar dias anteriores
-        this.daysContainer.innerHTML = '';
-        
-        // Calcular primeiro e último dia do mês
-        const firstDay = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), 1);
-        const lastDay = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 0);
-        
-        // Calcular data de início (incluindo dias do mês anterior)
-        const startDate = new Date(firstDay);
-        startDate.setDate(startDate.getDate() - firstDay.getDay());
-        
-        // Gerar 42 dias (6 semanas completas)
-        for (let i = 0; i < 42; i++) {
-            const date = new Date(startDate);
-            date.setDate(startDate.getDate() + i);
-            
-            const dayBtn = document.createElement('button');
-            dayBtn.className = 'calendar-day';
-            dayBtn.textContent = date.getDate();
-            dayBtn.type = 'button';
-            
-            // Verificar se é do mês atual
-            if (date.getMonth() !== this.currentDate.getMonth()) {
-                dayBtn.classList.add('other-month');
-            }
-            
-            // Verificar se é hoje
-            const today = new Date();
-            if (this.isSameDay(date, today)) {
-                dayBtn.classList.add('today');
-            }
-            
-            // Verificar se está selecionado
-            if (this.selectedDate && this.isSameDay(date, this.selectedDate)) {
-                dayBtn.classList.add('selected');
-            }
-            
-            // Event listener para seleção
-            dayBtn.addEventListener('click', () => this.selectDate(date));
-            
-            this.daysContainer.appendChild(dayBtn);
-        }
-    }
-    
-    isSameDay(date1, date2) {
-        return date1.getDate() === date2.getDate() &&
-               date1.getMonth() === date2.getMonth() &&
-               date1.getFullYear() === date2.getFullYear();
-    }
-    
-    isValidBRDate(dateString) {
-        const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-        const match = dateString.match(regex);
-        
-        if (!match) return false;
-        
-        const day = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10);
-        const year = parseInt(match[3], 10);
-        
-        if (month < 1 || month > 12) return false;
-        if (day < 1 || day > 31) return false;
-        
-        const date = new Date(year, month - 1, day);
-        return date.getFullYear() === year && 
-               date.getMonth() === month - 1 && 
-               date.getDate() === day;
-    }
-}
+// Elementos da interface
+const modeSelectionScreen = document.getElementById('modeSelectionScreen');
+const selectManualMode = document.getElementById('selectManualMode');
+const selectFileMode = document.getElementById('selectFileMode');
+const fileUploadSection = document.getElementById('fileUploadSection');
+const formWrapper = document.getElementById('formWrapper');
+const backFromFileBtn = document.getElementById('backFromFileBtn');
+const backFromFormBtn = document.getElementById('backFromFormBtn');
 
-// Inicializar calendário
-const calendarPopup = new CalendarPopup();
+// Elementos de upload
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const selectFileBtn = document.getElementById('selectFileBtn');
+const fileInfo = document.getElementById('fileInfo');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const removeFileBtn = document.getElementById('removeFileBtn');
+const extractBtn = document.getElementById('extractBtn');
 
-// Event listeners para os botões de calendário
-document.addEventListener('DOMContentLoaded', function() {
-    const calendarBtnApreensao = document.getElementById('calendarBtnApreensao');
-    const calendarBtnNascimento = document.getElementById('calendarBtnNascimento');
-    const dataApreensao = document.getElementById('dataApreensao');
-    const dataNascimento = document.getElementById('dataNascimento');
-    
-    // Botões de calendário
-    if (calendarBtnApreensao) {
-        calendarBtnApreensao.addEventListener('click', (e) => {
-            e.preventDefault();
-            calendarPopup.show(dataApreensao);
-        });
-    }
-    
-    if (calendarBtnNascimento) {
-        calendarBtnNascimento.addEventListener('click', (e) => {
-            e.preventDefault();
-            calendarPopup.show(dataNascimento);
-        });
-    }
-    
-    // Duplo clique nos campos de data para abrir calendário
-    if (dataApreensao) {
-        dataApreensao.addEventListener('dblclick', () => {
-            calendarPopup.show(dataApreensao);
-        });
-        
-        // Sincronizar calendário quando usuário digita
-        dataApreensao.addEventListener('input', () => {
-            calendarPopup.syncWithInput(dataApreensao);
-        });
-        
-        // Tooltip simples
-        dataApreensao.title = 'Data da apreensão (dd/mm/aaaa)';
-    }
-    
-    if (dataNascimento) {
-        dataNascimento.addEventListener('dblclick', () => {
-            calendarPopup.show(dataNascimento);
-        });
-        
-        // Sincronizar calendário quando usuário digita
-        dataNascimento.addEventListener('input', () => {
-            calendarPopup.syncWithInput(dataNascimento);
-        });
-        
-        // Tooltip simples
-        dataNascimento.title = 'Data de nascimento (dd/mm/aaaa)';
+let selectedFile = null;
+
+// Navegar para modo manual - vai direto para o formulário
+selectManualMode.addEventListener('click', () => {
+    modeSelectionScreen.style.display = 'none';
+    formWrapper.style.display = 'block';
+});
+
+// Modo arquivo - abre o seletor de arquivo imediatamente
+selectFileMode.addEventListener('click', () => {
+    fileInput.click();
+});
+
+// Voltar da tela de upload para seleção
+backFromFileBtn.addEventListener('click', () => {
+    fileUploadSection.style.display = 'none';
+    modeSelectionScreen.style.display = 'flex';
+    // Limpar arquivo selecionado
+    if (selectedFile) {
+        removeFileBtn.click();
     }
 });
+
+// Voltar da tela de formulário para seleção
+backFromFormBtn.addEventListener('click', () => {
+    formWrapper.style.display = 'none';
+    modeSelectionScreen.style.display = 'flex';
+});
+
+// Abrir seletor de arquivo
+selectFileBtn.addEventListener('click', () => {
+    fileInput.click();
+});
+
+uploadArea.addEventListener('click', (e) => {
+    if (e.target === uploadArea || e.target.closest('.upload-area')) {
+        fileInput.click();
+    }
+});
+
+// Processar arquivo selecionado
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        // Esconder tela de seleção e mostrar tela de upload
+        modeSelectionScreen.style.display = 'none';
+        fileUploadSection.style.display = 'block';
+        handleFileSelect(file);
+    }
+});
+
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('drag-over');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('drag-over');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        handleFileSelect(file);
+    }
+});
+
+// Função para processar arquivo selecionado
+function handleFileSelect(file) {
+    const validExtensions = ['.pdf', '.docx', '.doc', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.txt'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!validExtensions.includes(fileExtension)) {
+        showError('Tipo de arquivo não suportado. Use PDF, Word, Imagem ou TXT.');
+        return;
+    }
+    
+    selectedFile = file;
+    
+    // Mostrar informações do arquivo
+    fileName.textContent = file.name;
+    fileSize.textContent = formatFileSize(file.size);
+    
+    uploadArea.style.display = 'none';
+    fileInfo.style.display = 'block';
+}
+
+// Remover arquivo selecionado
+removeFileBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    uploadArea.style.display = 'block';
+    fileInfo.style.display = 'none';
+});
+
+// Extrair dados do arquivo
+extractBtn.addEventListener('click', async () => {
+    if (!selectedFile) {
+        showError('Nenhum arquivo selecionado');
+        return;
+    }
+    
+    showLoading('Extraindo dados', 'Processando arquivo... Isso pode levar alguns instantes.');
+    hideMessages();
+    
+    try {
+        // Enviar arquivo para o processo principal para extração
+        const result = await ipcRenderer.invoke('extract-file-data', selectedFile.path);
+        
+        hideLoading();
+        
+        if (result.success) {
+            // Preencher formulário com os dados extraídos
+            fillFormWithExtractedData(result.data);
+            showSuccess('Dados extraídos com sucesso!');
+            
+            // Ir para o formulário após extração
+            setTimeout(() => {
+                fileUploadSection.style.display = 'none';
+                formWrapper.style.display = 'block';
+            }, 2000);
+        } else {
+            showError(result.message || 'Erro ao extrair dados do arquivo');
+        }
+    } catch (error) {
+        console.error('Erro ao extrair dados:', error);
+        hideLoading();
+        showError('Erro ao processar arquivo: ' + error.message);
+    }
+});
+
+// Função para preencher o formulário com dados extraídos
+function fillFormWithExtractedData(data) {
+    // Preencher campos se os dados existirem
+    if (data.numeroGenesis) {
+        document.getElementById('numeroGenesis').value = data.numeroGenesis;
+    }
+    
+    if (data.dataApreensao) {
+        document.getElementById('dataApreensao').value = data.dataApreensao;
+    }
+    
+    if (data.artigo) {
+        document.getElementById('artigo').value = data.artigo;
+    }
+    
+    if (data.quantidade) {
+        document.getElementById('quantidade').value = data.quantidade;
+    }
+    
+    // Dados do proprietário
+    if (data.nomeProprietario) {
+        document.getElementById('nomeProprietario').value = data.nomeProprietario;
+    }
+    
+    if (data.dataNascimento) {
+        document.getElementById('dataNascimento').value = data.dataNascimento;
+    }
+    
+    if (data.tipoDocumento) {
+        document.getElementById('tipoDocumento').value = data.tipoDocumento;
+        // Trigger change event para aplicar máscara
+        document.getElementById('tipoDocumento').dispatchEvent(new Event('change'));
+    }
+    
+    if (data.numeroDocumento) {
+        document.getElementById('numeroDocumento').value = data.numeroDocumento;
+    }
+    
+    if (data.matricula) {
+        document.getElementById('matricula').value = data.matricula;
+    }
+    
+    // Adicionar classe de destaque aos campos preenchidos
+    highlightFilledFields();
+}
+
+// Destacar campos preenchidos automaticamente
+function highlightFilledFields() {
+    const inputs = document.querySelectorAll('#occurrenceForm input, #occurrenceForm select, #occurrenceForm textarea');
+    inputs.forEach(input => {
+        if (input.value && input.value.trim() !== '') {
+            input.style.backgroundColor = '#e8f5e9';
+            input.style.borderColor = '#4caf50';
+            
+            // Remover destaque após 3 segundos
+            setTimeout(() => {
+                input.style.backgroundColor = '';
+                input.style.borderColor = '';
+            }, 3000);
+        }
+    });
+}
+
+// Função auxiliar para formatar tamanho do arquivo
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+

@@ -123,6 +123,84 @@ body {
     box-shadow: 0 0 0 3px rgba(250, 199, 9, 0.1);
 }
 
+/* Checkbox "Lembrar usuário" */
+.form-group-checkbox {
+    margin-bottom: 18px;
+    margin-top: -18px;
+    text-align: right;
+}
+
+.checkbox-container {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-left: 24px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-container:hover {
+    opacity: 0.8;
+}
+
+.checkbox-container input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: absolute;
+    left: 0;
+    height: 16px;
+    width: 16px;
+    background-color: #ffffff;
+    border: 1.5px solid #d0d0d0;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+    border-color: #279b4d;
+    box-shadow: 0 0 0 2px rgba(39, 155, 77, 0.1);
+}
+
+.checkbox-container input:checked ~ .checkmark {
+    background-color: #279b4d;
+    border-color: #279b4d;
+    box-shadow: 0 2px 4px rgba(39, 155, 77, 0.2);
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-container .checkmark:after {
+    left: 5px;
+    top: 2px;
+    width: 3px;
+    height: 7px;
+    border: solid white;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox-label {
+    color: #666;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.2px;
+}
+
 .error-message {
     background: #fee;
     color: #c33;

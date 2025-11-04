@@ -14,21 +14,25 @@
     "ocorrencias",
     "electron"
   ],
-  "author": "JCBit",
+  "author": "SalvaSoluções",
   "license": "ISC",
   "dependencies": {
     "chart.js": "^4.4.0",
     "dotenv": "^16.3.1",
+    "flatpickr": "^4.6.13",
+    "mammoth": "^1.11.0",
+    "pdfjs-dist": "^4.8.69",
+    "tesseract.js": "^6.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "electron": "^39.0.0",
+    "electron": "^27.0.0",
     "electron-builder": "^24.6.4"
   },
   "build": {
-    "appId": "com.jcbit.secrimpo",
+    "appId": "com.salvasolucoes.secrimpo",
     "productName": "SECRIMPO PMDF",
-    "copyright": "Copyright © 2025 JCBit",
+    "copyright": "© 2025 SalvaSoluções",
     "compression": "maximum",
     "artifactName": "${productName}.${ext}",
     "win": {
@@ -48,7 +52,7 @@
         }
       ],
       "icon": "assets/App_Logo.ico",
-      "publisherName": "JCBit",
+      "publisherName": "SalvaSoluções",
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker",
       "fileAssociations": []

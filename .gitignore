@@ -143,3 +143,10 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+
+# ========================================
+# ARQUIVOS DE DESENVOLVIMENTO
+# ========================================
+COMMIT_MESSAGE.txt
+EXEMPLO_*.txt
+test-*.js

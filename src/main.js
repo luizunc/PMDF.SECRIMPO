@@ -243,7 +243,7 @@ ipcMain.handle('save-occurrence', async (event, data) => {
     console.log('✓ JSON salvo em:', jsonFilepath);
     
     // Enviar para Google Sheets (se configurado)
-    const GOOGLE_SHEETS_URL = "LINK DO SHEETS"; // Cole sua URL do Google Apps Script aqui
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec"; // Cole sua URL do Google Apps Script aqui
     
     if (GOOGLE_SHEETS_URL) {
       try {
@@ -260,15 +260,11 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             isoToBrDate(data.ocorrencia.dataApreensao),
             data.ocorrencia.leiInfrigida,
             data.ocorrencia.artigo,
-            data.ocorrencia.policialCondutor,
             data.itemApreendido.especie,
             data.itemApreendido.item,
             data.itemApreendido.quantidade,
             data.itemApreendido.unidadeMedida || '',
             data.itemApreendido.descricao,
-            data.itemApreendido.ocorrencia || '',
-            data.itemApreendido.proprietario || '',
-            data.itemApreendido.policial || '',
             data.proprietario.nome,
             isoToBrDate(data.proprietario.dataNascimento),
             data.proprietario.tipoDocumento,
@@ -367,7 +363,7 @@ ipcMain.on('load-dashboard', () => {
 // IPC Handler para obter todas as ocorrências do Google Sheets
 ipcMain.handle('get-occurrences', async (event) => {
   try {
-    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       console.log('Google Sheets URL não configurada, retornando dados locais');
@@ -433,7 +429,7 @@ ipcMain.handle('get-occurrences', async (event) => {
 // IPC Handler para atualizar ocorrência (APENAS Google Sheets)
 ipcMain.handle('update-occurrence', async (event, data) => {
   try {
-    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
@@ -442,23 +438,23 @@ ipcMain.handle('update-occurrence', async (event, data) => {
     const https = require('https');
     const url = require('url');
     
+    // Usar numeroGenesisOriginal para identificar a linha, se fornecido
+    const numeroGenesisParaBusca = data.numeroGenesisOriginal || data.ocorrencia.numeroGenesis;
+    
     const updateData = {
       action: 'update',
       timestamp: new Date().toLocaleString('pt-BR'),
-      numeroGenesis: data.ocorrencia.numeroGenesis,
+      numeroGenesisOriginal: numeroGenesisParaBusca, // Para identificar a linha
+      numeroGenesis: data.ocorrencia.numeroGenesis, // Novo valor (pode ser igual ao original)
       unidade: data.ocorrencia.unidade,
       dataApreensao: isoToBrDate(data.ocorrencia.dataApreensao),
       leiInfrigida: data.ocorrencia.leiInfrigida,
       artigo: data.ocorrencia.artigo,
-      policialCondutor: data.ocorrencia.policialCondutor,
       especie: data.itemApreendido.especie,
       item: data.itemApreendido.item,
       quantidade: data.itemApreendido.quantidade,
       unidadeMedida: data.itemApreendido.unidadeMedida || '',
       descricaoItem: data.itemApreendido.descricao,
-      ocorrenciaItem: data.itemApreendido.ocorrencia || '',
-      proprietarioItem: data.itemApreendido.proprietario || '',
-      policialItem: data.itemApreendido.policial || '',
       nomeProprietario: data.proprietario.nome,
       dataNascimento: isoToBrDate(data.proprietario.dataNascimento),
       tipoDocumento: data.proprietario.tipoDocumento,
@@ -471,6 +467,8 @@ ipcMain.handle('update-occurrence', async (event, data) => {
     };
     
     console.log('Enviando atualização para Google Sheets:', updateData);
+    console.log('Número Genesis para busca:', numeroGenesisParaBusca);
+    console.log('Número Genesis novo:', data.ocorrencia.numeroGenesis);
     
     const postData = JSON.stringify(updateData);
     
@@ -560,7 +558,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
 // IPC Handler para excluir ocorrência (APENAS Google Sheets)
 ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
   try {
-    const GOOGLE_SHEETS_URL = "LINK DO SHEETS";
+    const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
     
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
@@ -688,15 +686,11 @@ ipcMain.handle('export-occurrences', async (event) => {
         'Data Apreensão',
         'Lei Infringida',
         'Artigo',
-        'Policial Condutor',
         'Espécie',
         'Item',
         'Quantidade',
         'Unidade de Medida',
         'Descrição',
-        'Ocorrência Item',
-        'Proprietário Item',
-        'Policial Item',
         'Nome Proprietário',
         'Data Nascimento',
         'Tipo Documento',
@@ -722,15 +716,11 @@ ipcMain.handle('export-occurrences', async (event) => {
           isoToBrDate(data.ocorrencia.dataApreensao),
           data.ocorrencia.leiInfrigida,
           data.ocorrencia.artigo,
-          data.ocorrencia.policialCondutor,
           data.itemApreendido.especie,
           data.itemApreendido.item,
           data.itemApreendido.quantidade,
           data.itemApreendido.unidadeMedida || '',
           data.itemApreendido.descricao || '',
-          data.itemApreendido.ocorrencia || '',
-          data.itemApreendido.proprietario || '',
-          data.itemApreendido.policial || '',
           data.proprietario.nome,
           isoToBrDate(data.proprietario.dataNascimento),
           data.proprietario.tipoDocumento,
@@ -930,5 +920,54 @@ ipcMain.handle('print-pdf', async (event, pdfPath) => {
   } catch (error) {
     console.error('Erro ao imprimir PDF:', error);
     return { success: false, message: error.message };
+  }
+});
+
+// IPC Handler para extrair dados de arquivo
+ipcMain.handle('extract-file-data', async (event, filePath) => {
+  try {
+    console.log('=== INICIANDO EXTRAÇÃO DE ARQUIVO ===');
+    console.log('Arquivo:', filePath);
+    
+    // Verificar se o arquivo existe
+    if (!fs.existsSync(filePath)) {
+      throw new Error('Arquivo não encontrado: ' + filePath);
+    }
+    
+    const fileExtractor = require('./scripts/fileExtractor');
+    console.log('Módulo fileExtractor carregado com sucesso');
+    
+    // Extrair texto do arquivo
+    console.log('Iniciando extração de texto...');
+    const text = await fileExtractor.extractTextFromFile(filePath);
+    console.log('Texto extraído com sucesso!');
+    console.log('Tamanho do texto:', text.length, 'caracteres');
+    console.log('Primeiros 500 caracteres:', text.substring(0, 500));
+    
+    // Extrair campos específicos do texto
+    console.log('Extraindo campos específicos...');
+    const extractedFields = fileExtractor.extractFieldsFromText(text);
+    console.log('Campos extraídos:', JSON.stringify(extractedFields, null, 2));
+    
+    // Mapear para o formato do formulário
+    console.log('Mapeando dados para o formulário...');
+    const formData = fileExtractor.mapFieldsToForm(extractedFields);
+    console.log('Dados mapeados:', JSON.stringify(formData, null, 2));
+    
+    console.log('=== EXTRAÇÃO CONCLUÍDA COM SUCESSO ===');
+    
+    return { 
+      success: true, 
+      data: formData,
+      message: 'Dados extraídos com sucesso'
+    };
+  } catch (error) {
+    console.error('=== ERRO NA EXTRAÇÃO ===');
+    console.error('Mensagem:', error.message);
+    console.error('Stack:', error.stack);
+    return { 
+      success: false, 
+      message: error.message || 'Erro ao processar arquivo'
+    };
   }
 });

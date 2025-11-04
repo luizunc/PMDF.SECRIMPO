@@ -385,10 +385,15 @@ function closeModal() {
 async function saveEdit() {
     if (!currentOccurrence) return;
 
+    // Guardar o número Genesis original para identificação
+    const numeroGenesisOriginal = currentOccurrence.ocorrencia.numeroGenesis;
+    const numeroGenesisNovo = document.getElementById('edit-numeroGenesis').value;
+
     const updatedData = {
         id: currentOccurrence.id,
+        numeroGenesisOriginal: numeroGenesisOriginal, // Para identificar a linha no Google Sheets
         ocorrencia: {
-            numeroGenesis: document.getElementById('edit-numeroGenesis').value,
+            numeroGenesis: numeroGenesisNovo,
             unidade: document.getElementById('edit-unidade').value,
             dataApreensao: brDateToISO(document.getElementById('edit-dataApreensao').value),
             leiInfrigida: document.getElementById('edit-leiInfrigida').value,
@@ -416,6 +421,10 @@ async function saveEdit() {
         },
         metadata: currentOccurrence.metadata
     };
+
+    console.log('Dados de atualização:', updatedData);
+    console.log('Número Genesis Original:', numeroGenesisOriginal);
+    console.log('Número Genesis Novo:', numeroGenesisNovo);
 
     showLoading('Atualizando ocorrência', 'Salvando alterações...');
     try {

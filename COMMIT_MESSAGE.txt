@@ -1,16 +1,39 @@
-Feat: implementa sistema de geração e impressão de termos de apreensão com integração Google Sheets
+Feat: implementa preenchimento automático de formulários e redesign da etiqueta de apreensão
 
 Add:
-1. google-apps-script.gs - Script para integração com Google Sheets
-2. src/scripts/custom-alert.js - Sistema de alertas customizados
-3. src/styles/custom-alert.css - Estilos para alertas modais
-4. src/styles/loading.css - Estilos para loading overlay
-5. src/templates/termo_apreensao.html - Template para geração de PDF
-6. src/views/pdf_viewer.html - Visualizador de PDF com impressão
-7. auth/auth_keyauth.spec - Especificação para build da autenticação
+1. CORRECAO_GOOGLE_APPS_SCRIPT.md - Documentação para correção do Google Apps Script
+2. src/scripts/fileExtractor.js - Extração de dados de PDF, Word, imagens e TXT usando pdfjs-dist
 
 Edit:
-1. .gitignore - Adicionadas regras para credenciais KeyAuth e Google Sheets
+1. google-apps-script.gs - Corrigida função de atualização para usar numeroGenesisOriginal
+2. src/templates/termo_apreensao.html - Redesign completo da etiqueta A5 com novo layout
+3. src/views/panel.html - Implementado sistema de seleção manual/arquivo e remoção de setas
+4. src/scripts/panel.js - Adicionada lógica de navegação e preenchimento automático de formulários
+5. src/scripts/dashboard.js - Corrigido envio de numeroGenesisOriginal para atualização
+6. src/main.js - Atualizado handler de atualização com suporte a numeroGenesisOriginal
+7. src/styles/panel.css - Ajustes de layout e remoção de elementos visuais desnecessários
+8. package.json - Adicionado pdfjs-dist para extração de PDF sem dependências nativas
+
+Features:
+- Sistema de preenchimento automático via upload de arquivos (PDF, Word, imagens, TXT)
+- Extração inteligente de dados: CPF, RG, datas, nomes usando regex
+- Seleção de modo: manual ou por arquivo, com acesso direto ao formulário
+- Etiqueta A5 redesenhada com layout em grid e cabeçalhos pretos
+- Correção de bug na edição de número Genesis (agora usa numeroGenesisOriginal)
+- Logos PMDF e GDF aumentadas para 80px na etiqueta
+- Remoção de textos laterais no cabeçalho da etiqueta
+- Campos de proprietário e CPF/RG mantidos na etiqueta
+- Navegação fluida entre telas com botões de voltar
+- Highlight de campos após preenchimento automático
+- Suporte a drag & drop para upload de arquivos
+
+Fixes:
+- Corrigido erro "Ocorrência não encontrada" ao editar número Genesis
+- Removido canvas e pdf-parse para evitar problemas de compilação nativa
+- Migrado para pdfjs-dist legacy build para compatibilidade
+- Ajustada responsividade da tela de seleção
 
 Remove:
-- Nenhum arquivo removido
+- Setas de navegação dos cards de seleção
+- Ícone de check do botão "Extrair e Preencher Dados"
+- Dependências nativas problemáticas (canvas, pdf-parse)

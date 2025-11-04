@@ -378,7 +378,7 @@ body {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px #fac709;
+    box-shadow: 0 6px 20px rgba(39, 155, 77, 0.4);
 }
 
 .btn-primary:disabled {
@@ -481,315 +481,353 @@ body {
         width: 100%;
     }
 }
-/* ===== CALENDÁRIO POPUP ===== */
 
-/* Container do input com calendário */
-.date-input-container {
-    position: relative;
+/* Estilos para a tela de seleção de modo */
+.mode-selection-screen {
     display: flex;
     align-items: center;
+    justify-content: center;
+    min-height: auto;
+    padding: 30px 20px;
 }
 
-.date-input-container input {
-    flex: 1;
-    padding-right: 50px !important;
-    background-image: linear-gradient(45deg, transparent 40%, rgba(7, 29, 73, 0.05) 50%, transparent 60%);
-    background-size: 20px 20px;
-    background-repeat: no-repeat;
-    background-position: 10px center;
+.selection-container {
+    max-width: 900px;
+    width: 100%;
 }
 
-.date-input-container input:focus {
-    background-image: none;
-    box-shadow: 0 0 0 3px rgba(7, 29, 73, 0.1);
+.selection-header {
+    text-align: center;
+    margin-bottom: 30px;
 }
 
-.date-input-container input::placeholder {
-    color: #999;
-    font-style: italic;
+.header-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 15px;
+    color: #0a2a6b;
 }
 
-/* Botão do calendário */
-.calendar-btn {
-    position: absolute;
-    right: 12px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    color: #666;
-    transition: all 0.2s ease;
-    z-index: 10;
-}
-
-.calendar-btn:hover {
-    background: #f0f2f5;
+.selection-title {
+    font-size: 28px;
+    font-weight: 700;
     color: #071d49;
+    margin-bottom: 8px;
+}
+
+.selection-subtitle {
+    font-size: 16px;
+    color: #666;
+}
+
+.selection-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+
+.selection-card {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 30px 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.selection-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, #071d49 0%, #0a2a6b 100%);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.selection-card:hover {
+    border-color: #0a2a6b;
+    transform: translateY(-8px);
+    box-shadow: 0 12px 24px rgba(7, 29, 73, 0.15);
+}
+
+.selection-card:hover::before {
+    transform: scaleX(1);
+}
+
+.card-icon-wrapper {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 15px;
+    background: linear-gradient(135deg, #e8f4f8 0%, #d4e9f7 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.selection-card:hover .card-icon-wrapper {
+    background: linear-gradient(135deg, #071d49 0%, #0a2a6b 100%);
     transform: scale(1.1);
 }
 
-.calendar-btn svg {
+.card-icon {
+    width: 36px;
+    height: 36px;
+    color: #0a2a6b;
+    transition: color 0.3s ease;
+}
+
+.selection-card:hover .card-icon {
+    color: white;
+}
+
+.card-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #071d49;
+    margin-bottom: 10px;
+}
+
+.card-description {
+    font-size: 14px;
+    color: #666;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+.card-arrow {
+    display: none;
+}
+
+/* Botão de voltar */
+.btn-back {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+    background: #e8f4f8;
+    border-color: #0a2a6b;
+    color: #0a2a6b;
+}
+
+.btn-back svg {
     width: 20px;
     height: 20px;
 }
 
-/* Overlay do calendário */
-.calendar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    backdrop-filter: blur(3px);
-}
-
-.calendar-overlay.active {
-    display: flex;
-    animation: fadeIn 0.3s ease;
-}
-
-/* Container principal do calendário */
-.calendar-container {
+/* Estilos para a seção de upload de arquivo */
+.file-upload-section {
     background: white;
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    padding: 24px;
-    width: 350px;
-    max-width: 95vw;
-    animation: slideIn 0.3s ease;
-    border: 1px solid #e0e0e0;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 25px;
 }
 
-/* Cabeçalho do calendário */
-.calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid #f0f2f5;
+.upload-container {
+    max-width: 100%;
 }
 
-.calendar-nav {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 10px;
-    border-radius: 8px;
-    color: #666;
-    transition: all 0.2s ease;
-}
-
-.calendar-nav:hover {
-    background: #e3f2fd;
-    color: #1976d2;
-    transform: scale(1.1);
-}
-
-.calendar-nav svg {
-    width: 22px;
-    height: 22px;
-}
-
-.calendar-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #071d49;
+.upload-area {
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    padding: 40px;
     text-align: center;
-    min-width: 150px;
-}
-
-/* Dias da semana */
-.calendar-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    margin-bottom: 12px;
-}
-
-.weekday {
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: #666;
-    padding: 10px 4px;
     background: #f8f9fa;
-    border-radius: 6px;
+    transition: all 0.3s ease;
 }
 
-/* Grade de dias */
-.calendar-days {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+.upload-area.drag-over {
+    border-color: #0a2a6b;
+    background: #e8f4f8;
+}
+
+.upload-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    color: #0a2a6b;
+}
+
+.upload-area h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #071d49;
+    margin-bottom: 10px;
+}
+
+.upload-area p {
+    font-size: 14px;
+    color: #666;
     margin-bottom: 20px;
 }
 
-.calendar-day {
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    border: none;
-    background: none;
-    position: relative;
-}
-
-.calendar-day:hover {
-    background: #e3f2fd;
-    color: #1976d2;
-    transform: scale(1.1);
-}
-
-.calendar-day.other-month {
-    color: #ccc;
-    opacity: 0.5;
-}
-
-.calendar-day.other-month:hover {
-    background: #f5f5f5;
-    color: #999;
-}
-
-.calendar-day.today {
-    background: linear-gradient(135deg, #fac709 0%, #f9b000 100%);
-    color: white;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(250, 199, 9, 0.4);
-}
-
-.calendar-day.today:hover {
-    background: linear-gradient(135deg, #f9b000 0%, #e6a000 100%);
-    transform: scale(1.15);
-}
-
-.calendar-day.selected {
+.btn-upload {
     background: linear-gradient(135deg, #071d49 0%, #0a2a6b 100%);
     color: white;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(7, 29, 73, 0.4);
-}
-
-.calendar-day.selected:hover {
-    background: linear-gradient(135deg, #0a2a6b 0%, #0d3380 100%);
-    transform: scale(1.15);
-}
-
-/* Rodapé do calendário */
-.calendar-footer {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    padding-top: 15px;
-    border-top: 2px solid #f0f2f5;
-}
-
-.calendar-btn-cancel,
-.calendar-btn-today {
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
+    border: none;
+    padding: 12px 30px;
     border-radius: 8px;
-    transition: all 0.2s ease;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-.calendar-btn-cancel:hover {
+.btn-upload:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(7, 29, 73, 0.3);
 }
 
-.calendar-btn-today:hover {
+/* Informações do arquivo selecionado */
+.file-info {
+    margin-top: 20px;
+}
+
+.file-details {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.file-icon {
+    width: 40px;
+    height: 40px;
+    color: #0a2a6b;
+    flex-shrink: 0;
+}
+
+.file-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.file-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #071d49;
+}
+
+.file-size {
+    font-size: 13px;
+    color: #666;
+}
+
+.btn-remove {
+    background: #ff4444;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-remove:hover {
+    background: #cc0000;
+    transform: scale(1.1);
+}
+
+.btn-remove svg {
+    width: 20px;
+    height: 20px;
+    color: white;
+}
+
+.btn-extract {
+    width: 100%;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.btn-extract:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(39, 155, 77, 0.4);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
-/* Animações */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateY(-30px) scale(0.9);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
-}
-
-/* Responsivo */
+/* Responsividade */
 @media (max-width: 768px) {
-    .calendar-container {
-        width: 320px;
-        padding: 20px;
+    .selection-options {
+        grid-template-columns: 1fr;
+        gap: 20px;
     }
     
-    .calendar-title {
-        font-size: 16px;
-        min-width: 120px;
+    .selection-title {
+        font-size: 24px;
     }
     
-    .calendar-day {
+    .selection-subtitle {
+        font-size: 14px;
+    }
+    
+    .header-icon {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .selection-header {
+        margin-bottom: 25px;
+    }
+    
+    .selection-card {
+        padding: 25px 20px;
+    }
+    
+    .card-icon-wrapper {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .card-icon {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .card-title {
+        font-size: 18px;
+    }
+    
+    .card-description {
         font-size: 13px;
     }
     
-    .weekday {
-        font-size: 12px;
-        padding: 8px 2px;
+    .upload-area {
+        padding: 30px 20px;
     }
-    
-    .calendar-footer {
-        flex-direction: column;
-    }
-    
-    .calendar-btn-cancel,
-    .calendar-btn-today {
-        width: 100%;
-    }
-}/* Dic
-as visuais para campos de data */
-.date-input-container {
-    position: relative;
-}
-
-/* Dicas removidas para interface mais limpa */
-
-/* Melhorar feedback visual durante digitação */
-.date-input-container input:valid {
-    border-color: #279b4d;
-    background-color: rgba(39, 155, 77, 0.05);
-}
-
-.date-input-container input:invalid:not(:placeholder-shown) {
-    border-color: #c33;
-    background-color: rgba(204, 51, 51, 0.05);
-}
-
-/* Animação de sucesso quando data é válida */
-@keyframes dateSuccess {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
-}
-
-.date-input-container input.date-valid {
-    animation: dateSuccess 0.3s ease;
 }

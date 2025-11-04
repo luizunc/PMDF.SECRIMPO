@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,7 +8,6 @@
     <link rel="stylesheet" href="../styles/loading.css">
     <link rel="stylesheet" href="../styles/custom-alert.css">
 </head>
-
 <body>
     <div class="app-container">
         <!-- Header -->
@@ -27,26 +25,25 @@
                 <div class="user-menu-container">
                     <button class="user-menu-button" id="userMenuBtn">
                         <svg class="user-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none" />
-                            <circle cx="12" cy="9" r="3.5" fill="currentColor" />
-                            <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor" />
+                            <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                            <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
+                            <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor"/>
                         </svg>
                     </button>
                     <div class="user-dropdown" id="userDropdown">
                         <div class="dropdown-header">
                             <svg class="dropdown-user-icon" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none" />
-                                <circle cx="12" cy="9" r="3.5" fill="currentColor" />
+                                <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                                <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
                             </svg>
                             <span class="user-info" id="userInfo">Usuário conectado</span>
                         </div>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" id="logoutBtn">
-                            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
+                            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
                             </svg>
                             <span>Sair</span>
                         </button>
@@ -59,17 +56,17 @@
         <nav class="nav-tabs">
             <button class="nav-tab" id="tabDashboard">
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
                 </svg>
                 Controle de Ocorrências
             </button>
             <button class="nav-tab active" id="tabNovaOcorrencia">
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 Nova Ocorrência
             </button>
@@ -77,8 +74,103 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <form id="occurrenceForm" class="occurrence-form">
+            <!-- Tela Inicial de Seleção de Modo -->
+            <div class="mode-selection-screen" id="modeSelectionScreen">
+                <div class="selection-container">
+                    <div class="selection-header">
+                        <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <h1 class="selection-title">Nova Ocorrência</h1>
+                        <p class="selection-subtitle">Escolha como deseja preencher o formulário de ocorrência</p>
+                    </div>
+                    
+                    <div class="selection-options">
+                        <button type="button" class="selection-card" id="selectManualMode">
+                            <div class="card-icon-wrapper">
+                                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                            </div>
+                            <h2 class="card-title">Preenchimento Manual</h2>
+                            <p class="card-description">Digite todas as informações manualmente no formulário</p>
+                        </button>
+                        
+                        <button type="button" class="selection-card" id="selectFileMode">
+                            <div class="card-icon-wrapper">
+                                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <h2 class="card-title">Preenchimento por Arquivo</h2>
+                            <p class="card-description">Extraia dados automaticamente de PDF, Word, imagens ou texto</p>
+                        </button>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Seção de Upload de Arquivo (oculta inicialmente) -->
+            <div class="file-upload-section" id="fileUploadSection" style="display: none;">
+                <button type="button" class="btn-back" id="backFromFileBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                    Voltar
+                </button>
+                
+                <div class="upload-container">
+                    <div class="upload-area" id="uploadArea">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <h3>Arraste o arquivo aqui ou clique para selecionar</h3>
+                        <p>Formatos suportados: PDF, Word (.docx), Imagens (JPG, PNG), TXT</p>
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.bmp,.tiff,.txt" style="display: none;">
+                        <button type="button" class="btn-upload" id="selectFileBtn">Selecionar Arquivo</button>
+                    </div>
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <div class="file-details">
+                            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <div class="file-text">
+                                <span class="file-name" id="fileName"></span>
+                                <span class="file-size" id="fileSize"></span>
+                            </div>
+                            <button type="button" class="btn-remove" id="removeFileBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <button type="button" class="btn-extract" id="extractBtn">
+                            Extrair e Preencher Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário de Ocorrência (oculto inicialmente) -->
+            <div class="form-wrapper" id="formWrapper" style="display: none;">
+                <button type="button" class="btn-back" id="backFromFormBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                    Voltar
+                </button>
+                
+                <form id="occurrenceForm" class="occurrence-form">
+                
                 <!-- Seção Ocorrência -->
                 <section class="form-section">
                     <h2 class="section-title">
@@ -100,19 +192,7 @@
                         </div>
                         <div class="form-group">
                             <label for="dataApreensao">Data da Apreensão</label>
-                            <div class="date-input-container">
-                                <input type="text" id="dataApreensao" name="dataApreensao" placeholder="dd/mm/aaaa"
-                                    maxlength="10" required>
-                                <button type="button" class="calendar-btn" id="calendarBtnApreensao"
-                                    title="Abrir calendário">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                        <line x1="16" y1="2" x2="16" y2="6" />
-                                        <line x1="8" y1="2" x2="8" y2="6" />
-                                        <line x1="3" y1="10" x2="21" y2="10" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <input type="text" id="dataApreensao" name="dataApreensao" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="leiInfrigida">Lei Infringida</label>
@@ -121,10 +201,6 @@
                         <div class="form-group">
                             <label for="artigo">Artigo</label>
                             <input type="text" id="artigo" name="artigo" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="policialCondutor">Policial Condutor</label>
-                            <input type="text" id="policialCondutor" name="policialCondutor" required>
                         </div>
                     </div>
                 </section>
@@ -156,24 +232,13 @@
                                     <option value="g">G (Grama)</option>
                                     <option value="kg">Kg (Quilograma)</option>
                                     <option value="t">T (Tonelada)</option>
+                                    <option value="un">UN (Unidade)</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group full-width">
                             <label for="descricaoItem">Descrição</label>
                             <textarea id="descricaoItem" name="descricaoItem" rows="3"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="ocorrenciaItem">Ocorrência</label>
-                            <input type="text" id="ocorrenciaItem" name="ocorrenciaItem">
-                        </div>
-                        <div class="form-group">
-                            <label for="proprietarioItem">Proprietário</label>
-                            <input type="text" id="proprietarioItem" name="proprietarioItem">
-                        </div>
-                        <div class="form-group">
-                            <label for="policialItem">Policial</label>
-                            <input type="text" id="policialItem" name="policialItem">
                         </div>
                     </div>
                 </section>
@@ -190,19 +255,7 @@
                         </div>
                         <div class="form-group">
                             <label for="dataNascimento">Data de Nascimento</label>
-                            <div class="date-input-container">
-                                <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa"
-                                    maxlength="10" required>
-                                <button type="button" class="calendar-btn" id="calendarBtnNascimento"
-                                    title="Abrir calendário">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                        <line x1="16" y1="2" x2="16" y2="6" />
-                                        <line x1="8" y1="2" x2="8" y2="6" />
-                                        <line x1="3" y1="10" x2="21" y2="10" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="tipoDocumento">Tipo de Documento</label>
@@ -271,7 +324,8 @@
 
                 <div id="successMessage" class="success-message" style="display: none;"></div>
                 <div id="errorMessage" class="error-message" style="display: none;"></div>
-            </form>
+                </form>
+            </div>
         </main>
     </div>
 
@@ -284,43 +338,7 @@
         </div>
     </div>
 
-    <!-- Calendário Popup -->
-    <div class="calendar-overlay" id="calendarOverlay">
-        <div class="calendar-container">
-            <div class="calendar-header">
-                <button type="button" class="calendar-nav" id="prevMonth" title="Mês anterior">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6" />
-                    </svg>
-                </button>
-                <div class="calendar-title" id="calendarTitle">Janeiro 2025</div>
-                <button type="button" class="calendar-nav" id="nextMonth" title="Próximo mês">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                </button>
-            </div>
-            <div class="calendar-weekdays">
-                <div class="weekday">Dom</div>
-                <div class="weekday">Seg</div>
-                <div class="weekday">Ter</div>
-                <div class="weekday">Qua</div>
-                <div class="weekday">Qui</div>
-                <div class="weekday">Sex</div>
-                <div class="weekday">Sáb</div>
-            </div>
-            <div class="calendar-days" id="calendarDays">
-                <!-- Dias serão inseridos via JavaScript -->
-            </div>
-            <div class="calendar-footer">
-                <button type="button" class="btn-secondary calendar-btn-cancel" id="calendarCancel">Cancelar</button>
-                <button type="button" class="btn-primary calendar-btn-today" id="calendarToday">Hoje</button>
-            </div>
-        </div>
-    </div>
-
     <script src="../scripts/custom-alert.js"></script>
     <script src="../scripts/panel.js"></script>
 </body>
-
 </html>
