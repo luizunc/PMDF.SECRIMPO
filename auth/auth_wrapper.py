@@ -11,6 +11,16 @@ from pathlib import Path
 # Configurar stdout para modo unbuffered (importante para executáveis PyInstaller)
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 
+# Adicionar o diretório do executável ao sys.path para PyInstaller
+if getattr(sys, 'frozen', False):
+    # Rodando como executável PyInstaller
+    bundle_dir = sys._MEIPASS
+    sys.path.insert(0, bundle_dir)
+else:
+    # Rodando como script Python normal
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, bundle_dir)
+
 # Configurações KeyAuth
 KEYAUTH_NAME = "SECRIMPO_PMDF"
 KEYAUTH_OWNERID = "4Roety0GwG"
@@ -19,10 +29,10 @@ KEYAUTH_VERSION = "1.0"
 # Importar KeyAuth oficial
 try:
     from keyauth import api
-except ImportError:
+except ImportError as e:
     print(json.dumps({
         "success": False,
-        "message": "Arquivo keyauth.py não encontrado na pasta auth/"
+        "message": f"Arquivo keyauth.py não encontrado na pasta auth/. Erro: {str(e)}"
     }))
     sys.exit(1)
 

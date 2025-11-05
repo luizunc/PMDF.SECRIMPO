@@ -971,3 +971,83 @@ ipcMain.handle('extract-file-data', async (event, filePath) => {
     };
   }
 });
+
+// IPC Handler para obter contagem de usuários ativos do KeyAuth
+ipcMain.handle('get-active-users-count', async (event) => {
+  return new Promise((resolve, reject) => {
+    const isDev = !app.isPackaged;
+    
+    let pythonCommand;
+    let pythonArgs;
+    
+    if (isDev) {
+      // Desenvolvimento: usar Python script diretamente
+      const pythonScript = path.join(__dirname, '../auth/get_online_users.py');
+      pythonCommand = 'python';
+      pythonArgs = [pythonScript];
+    } else {
+      // Produção: usar executável compilado (se existir)
+      const exePath = path.join(process.resourcesPath, 'auth/get_online_users.exe');
+      
+      if (fs.existsSync(exePath)) {
+        pythonCommand = exePath;
+        pythonArgs = [];
+      } else {
+        // Fallback: tentar Python script
+        const pythonScript = path.join(__dirname, '../auth/get_online_users.py');
+        pythonCommand = 'python';
+        pythonArgs = [pythonScript];
+      }
+    }
+    
+    const pythonProcess = spawn(pythonCommand, pythonArgs);
+    
+    let dataString = '';
+    let errorString = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      dataString += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      errorString += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      try {
+        // Extrair JSON da saída
+        const lines = dataString.trim().split('\n');
+        let jsonString = '';
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (trimmedLine.startsWith('{')) {
+            jsonString = trimmedLine;
+            break;
+          }
+        }
+        
+        if (jsonString) {
+          const result = JSON.parse(jsonString);
+          if (result.success) {
+            resolve(result.count);
+          } else {
+            console.error('Erro ao buscar usuários online:', result.error);
+            resolve(1); // Fallback: 1 usuário
+          }
+        } else {
+          console.error('Nenhum JSON encontrado na resposta');
+          resolve(1); // Fallback: 1 usuário
+        }
+      } catch (e) {
+        console.error('Erro ao parsear resposta de usuários online:', e);
+        resolve(1); // Fallback: 1 usuário
+      }
+    });
+    
+    pythonProcess.on('error', (error) => {
+      console.error('Erro ao executar script de usuários online:', error);
+      resolve(1); // Fallback: 1 usuário
+    });
+  });
+});

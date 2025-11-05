@@ -140,20 +140,158 @@
                     </div>
                 </div>
 
-                <div class="charts-grid">
-                    <div class="chart-container">
-                        <h3 class="chart-title">Ocorrências nos Últimos 30 Dias</h3>
-                        <canvas id="lineChart"></canvas>
+                <!-- Seção: Ocorrências Gerais -->
+                <div class="chart-section">
+                    <h2 class="chart-section-title">Ocorrências Gerais</h2>
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Período</h3>
+                                <div class="date-filter">
+                                    <input type="text" id="filterDataInicio" placeholder="Início" maxlength="10">
+                                    <span class="date-separator">até</span>
+                                    <input type="text" id="filterDataFim" placeholder="Fim" maxlength="10">
+                                    <button class="btn-filter" id="btnFilterChart">Filtrar</button>
+                                    <button class="btn-reset-filter" id="btnResetFilter" title="Resetar">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                            <path d="M21 3v5h-5"/>
+                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                            <path d="M3 21v-5h5"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="lineChart"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Mês</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalMonthOccurrences">0</span>
+                                </div>
+                            </div>
+                            <canvas id="pieChartMonth"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Últimos 7 dias</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalDayOccurrences">0</span>
+                                </div>
+                            </div>
+                            <canvas id="barChartDay"></canvas>
+                        </div>
                     </div>
-                    
-                    <div class="chart-container">
-                        <h3 class="chart-title">Ocorrências por Unidade</h3>
-                        <canvas id="barChart"></canvas>
+                </div>
+
+                <!-- Seção: Ocorrências por Unidade -->
+                <div class="chart-section">
+                    <h2 class="chart-section-title">Ocorrências por Unidade</h2>
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Período</h3>
+                                <div class="date-filter">
+                                    <input type="text" id="filterDataInicioUnidade" placeholder="Início" maxlength="10">
+                                    <span class="date-separator">até</span>
+                                    <input type="text" id="filterDataFimUnidade" placeholder="Fim" maxlength="10">
+                                    <button class="btn-filter" id="btnFilterChartUnidade">Filtrar</button>
+                                    <button class="btn-reset-filter" id="btnResetFilterUnidade" title="Resetar">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                            <path d="M21 3v5h-5"/>
+                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                            <path d="M3 21v-5h5"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalUnidadePeriodo">0</span>
+                                </div>
+                            </div>
+                            <canvas id="pieChartUnidadePeriodo"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Mês</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalUnidadeMes">0</span>
+                                </div>
+                            </div>
+                            <canvas id="pieChartUnidadeMes"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Últimos 7 dias</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalUnidadeDia">0</span>
+                                </div>
+                            </div>
+                            <canvas id="barChartUnidadeDia"></canvas>
+                        </div>
                     </div>
-                    
-                    <div class="chart-container">
-                        <h3 class="chart-title">Tipos de Itens Apreendidos</h3>
-                        <canvas id="doughnutChart"></canvas>
+                </div>
+
+                <!-- Seção: Tipos de Itens Apreendidos -->
+                <div class="chart-section">
+                    <h2 class="chart-section-title">Tipos de Itens Apreendidos</h2>
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Período</h3>
+                                <div class="date-filter">
+                                    <input type="text" id="filterDataInicioItens" placeholder="Início" maxlength="10">
+                                    <span class="date-separator">até</span>
+                                    <input type="text" id="filterDataFimItens" placeholder="Fim" maxlength="10">
+                                    <button class="btn-filter" id="btnFilterChartItens">Filtrar</button>
+                                    <button class="btn-reset-filter" id="btnResetFilterItens" title="Resetar">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                                            <path d="M21 3v5h-5"/>
+                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                                            <path d="M3 21v-5h5"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalItensPeriodo">0</span>
+                                </div>
+                            </div>
+                            <canvas id="pieChartItensPeriodo"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Por Mês</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalItensMes">0</span>
+                                </div>
+                            </div>
+                            <canvas id="pieChartItensMes"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Últimos 7 dias</h3>
+                                <div class="chart-total">
+                                    <span class="total-label">Total:</span>
+                                    <span class="total-value" id="totalItensDia">0</span>
+                                </div>
+                            </div>
+                            <canvas id="barChartItensDia"></canvas>
+                        </div>
                     </div>
                 </div>
             </section>

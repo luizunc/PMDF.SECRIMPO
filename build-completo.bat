@@ -4,6 +4,30 @@ echo   BUILD COMPLETO - SECRIMPO PMDF
 echo ========================================
 echo.
 
+echo [0/5] Limpando arquivos de build anteriores...
+if exist "dist" (
+    echo Removendo pasta dist...
+    rmdir /s /q dist
+)
+if exist "build" (
+    echo Removendo pasta build...
+    rmdir /s /q build
+)
+if exist "auth\dist" (
+    echo Removendo pasta auth\dist...
+    rmdir /s /q auth\dist
+)
+if exist "auth\build" (
+    echo Removendo pasta auth\build...
+    rmdir /s /q auth\build
+)
+if exist "auth\__pycache__" (
+    echo Removendo cache Python...
+    rmdir /s /q auth\__pycache__
+)
+echo [OK] Limpeza concluida!
+echo.
+
 REM Verificar se Python esta instalado
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -57,7 +81,8 @@ if not exist "dist" mkdir dist
 if not exist "..\build" mkdir ..\build
 
 REM Compilar com PyInstaller (modo noconsole para producao - sem janelas extras)
-pyinstaller --onefile --noconsole --name auth_keyauth --distpath dist --workpath ..\build --specpath ..\build --add-data "keyauth.py;." --hidden-import=win32security --hidden-import=requests --collect-all pywin32 --collect-all requests auth_wrapper.py
+REM Garantir que keyauth.py seja incluido como modulo Python no executavel
+pyinstaller --onefile --noconsole --name auth_keyauth --distpath dist --workpath ..\build --specpath ..\build --paths . --hidden-import=keyauth --hidden-import=_cffi_backend --hidden-import=win32security --hidden-import=requests --hidden-import=discord_interactions --hidden-import=qrcode --hidden-import=PIL --hidden-import=PIL.Image --hidden-import=dotenv --collect-all pywin32 --collect-all requests --collect-all discord_interactions --collect-all qrcode --collect-all PIL --copy-metadata discord-interactions auth_wrapper.py
 
 cd ..
 if errorlevel 1 (

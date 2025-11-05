@@ -305,6 +305,40 @@ document.getElementById('tipoDocumento').addEventListener('change', function(e) 
     }
 });
 
+// Função para atualizar o Nº Genesis com o ano automaticamente
+function updateGenesisWithYear() {
+    const dataApreensao = document.getElementById('dataApreensao').value;
+    const numeroGenesis = document.getElementById('numeroGenesis');
+    
+    // Verificar se a data está completa (dd/mm/aaaa)
+    if (dataApreensao.length === 10 && isValidDate(dataApreensao)) {
+        const year = dataApreensao.split('/')[2]; // Extrair o ano
+        const currentValue = numeroGenesis.value;
+        
+        // Remover ano anterior se existir (formato: xxxx-yyyy)
+        const valueWithoutYear = currentValue.replace(/-\d{4}$/, '');
+        
+        // Adicionar o novo ano
+        if (valueWithoutYear) {
+            numeroGenesis.value = valueWithoutYear + '-' + year;
+        }
+    }
+}
+
+// Atualizar Nº Genesis quando a data de apreensão mudar
+document.getElementById('dataApreensao').addEventListener('input', function(e) {
+    applyDateMask(e);
+    updateGenesisWithYear();
+});
+
+// Atualizar Nº Genesis quando o número for digitado
+document.getElementById('numeroGenesis').addEventListener('input', function(e) {
+    updateGenesisWithYear();
+});
+
+// Aplicar máscara de data ao campo de data de nascimento
+document.getElementById('dataNascimento').addEventListener('input', applyDateMask);
+
 // Navigation tab events
 tabDashboard.addEventListener('click', () => {
     ipcRenderer.send('load-dashboard');

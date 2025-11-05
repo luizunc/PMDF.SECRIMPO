@@ -23,6 +23,7 @@ const sectionOcorrencias = document.getElementById('sectionOcorrencias');
 const statTotal = document.getElementById('statTotal');
 const statMes = document.getElementById('statMes');
 const statHoje = document.getElementById('statHoje');
+const statUsuarios = document.getElementById('statUsuarios');
 
 // Table
 const occurrencesTableBody = document.getElementById('occurrencesTableBody');
@@ -58,10 +59,41 @@ let filteredOccurrences = [];
 let currentOccurrence = null;
 let isEditMode = false;
 
-// Charts
+// Charts - Ocorrências Gerais
 let lineChart = null;
-let barChart = null;
-let doughnutChart = null;
+let pieChartMonth = null;
+let barChartDay = null;
+
+// Charts - Unidade
+let pieChartUnidadePeriodo = null;
+let pieChartUnidadeMes = null;
+let barChartUnidadeDia = null;
+
+// Charts - Itens
+let pieChartItensPeriodo = null;
+let pieChartItensMes = null;
+let barChartItensDia = null;
+
+// Date filter
+let customDateRange = null; // { startDate: Date, endDate: Date }
+const filterDataInicio = document.getElementById('filterDataInicio');
+const filterDataFim = document.getElementById('filterDataFim');
+const btnFilterChart = document.getElementById('btnFilterChart');
+const btnResetFilter = document.getElementById('btnResetFilter');
+
+// Date filter for Unidade chart
+let customDateRangeUnidade = null;
+const filterDataInicioUnidade = document.getElementById('filterDataInicioUnidade');
+const filterDataFimUnidade = document.getElementById('filterDataFimUnidade');
+const btnFilterChartUnidade = document.getElementById('btnFilterChartUnidade');
+const btnResetFilterUnidade = document.getElementById('btnResetFilterUnidade');
+
+// Date filter for Itens chart
+let customDateRangeItens = null;
+const filterDataInicioItens = document.getElementById('filterDataInicioItens');
+const filterDataFimItens = document.getElementById('filterDataFimItens');
+const btnFilterChartItens = document.getElementById('btnFilterChartItens');
+const btnResetFilterItens = document.getElementById('btnResetFilterItens');
 
 // Load user info
 window.addEventListener('load', () => {
@@ -171,8 +203,34 @@ function updateStats() {
     }).length;
     statHoje.textContent = today;
     
+    // Update active users count from KeyAuth
+    updateActiveUsers();
+    
     // Update charts
     updateCharts();
+}
+
+// Update active users count from KeyAuth
+async function updateActiveUsers() {
+    try {
+        if (window.electron && window.electron.ipcRenderer) {
+            const count = await window.electron.ipcRenderer.invoke('get-active-users-count');
+            if (statUsuarios) {
+                statUsuarios.textContent = count || 1;
+            }
+        } else {
+            // Fallback: show 1 (current user)
+            if (statUsuarios) {
+                statUsuarios.textContent = 1;
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao buscar usuários ativos:', error);
+        // Fallback: show 1 (current user)
+        if (statUsuarios) {
+            statUsuarios.textContent = 1;
+        }
+    }
 }
 
 // Render table
@@ -720,12 +778,23 @@ function hideEmptyState() {
 
 // Update charts
 function updateCharts() {
+    // Ocorrências Gerais
     createLineChart();
-    createBarChart();
-    createDoughnutChart();
+    createPieChartMonth();
+    createBarChartDay();
+    
+    // Unidade
+    createPieChartUnidadePeriodo();
+    createPieChartUnidadeMes();
+    createBarChartUnidadeDia();
+    
+    // Itens
+    createPieChartItensPeriodo();
+    createPieChartItensMes();
+    createBarChartItensDia();
 }
 
-// Create line chart - Occurrences over last 30 days
+// Create pie chart - Occurrences over custom date range or last 30 days
 function createLineChart() {
     const ctx = document.getElementById('lineChart');
     if (!ctx) return;
@@ -735,209 +804,79 @@ function createLineChart() {
         lineChart.destroy();
     }
     
-    // Get last 30 days data
-    const last30Days = [];
-    const counts = [];
-    const now = new Date();
+    // Determine date range
+    let startDate, endDate;
+    if (customDateRange) {
+        startDate = customDateRange.startDate;
+        endDate = customDateRange.endDate;
+    } else {
+        // Default: last 30 days
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 29);
+    }
     
-    for (let i = 29; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        last30Days.push(dateStr);
+    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    
+    let labels = [];
+    let counts = [];
+    
+    // Se período maior que 60 dias, agrupar por mês
+    if (daysDiff > 60) {
+        const monthCounts = {};
         
-        const count = allOccurrences.filter(occ => {
+        // Filtrar ocorrências no período
+        const filteredOccs = allOccurrences.filter(occ => {
             if (!occ.metadata?.dataRegistro) return false;
             const occDate = new Date(occ.metadata.dataRegistro);
-            return occDate.toDateString() === date.toDateString();
-        }).length;
-        counts.push(count);
+            return occDate >= startDate && occDate <= endDate;
+        });
+        
+        // Contar por mês
+        filteredOccs.forEach(occ => {
+            const occDate = new Date(occ.metadata.dataRegistro);
+            const monthKey = `${monthNames[occDate.getMonth()]}/${occDate.getFullYear()}`;
+            monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+        });
+        
+        // Ordenar por data
+        const sortedMonths = Object.entries(monthCounts).sort((a, b) => {
+            const [monthA, yearA] = a[0].split('/');
+            const [monthB, yearB] = b[0].split('/');
+            const dateA = new Date(yearA, monthNames.indexOf(monthA));
+            const dateB = new Date(yearB, monthNames.indexOf(monthB));
+            return dateA - dateB;
+        });
+        
+        labels = sortedMonths.map(([month]) => month);
+        counts = sortedMonths.map(([, count]) => count);
+    } else {
+        // Período curto: agrupar por dia
+        for (let i = 0; i <= daysDiff; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            labels.push(dateStr);
+            
+            const count = allOccurrences.filter(occ => {
+                if (!occ.metadata?.dataRegistro) return false;
+                const occDate = new Date(occ.metadata.dataRegistro);
+                return occDate.toDateString() === date.toDateString();
+            }).length;
+            counts.push(count);
+        }
     }
+    
+    const colors = ['#279b4d', '#071d49', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
     
     lineChart = new Chart(ctx, {
-        type: 'line',
+        type: 'pie',
         data: {
-            labels: last30Days,
+            labels: labels,
             datasets: [{
-                label: 'Ocorrências',
                 data: counts,
-                borderColor: '#279b4d',
-                backgroundColor: 'rgba(39, 155, 77, 0.1)',
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: '#279b4d',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 12,
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 1
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        color: '#666'
-                    },
-                    grid: {
-                        color: '#f0f2f5'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: '#666',
-                        maxRotation: 45,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Create bar chart - Occurrences by unit
-function createBarChart() {
-    const ctx = document.getElementById('barChart');
-    if (!ctx) return;
-    
-    // Destroy existing chart
-    if (barChart) {
-        barChart.destroy();
-    }
-    
-    // Count by unit
-    const unitCounts = {};
-    allOccurrences.forEach(occ => {
-        const unit = occ.ocorrencia?.unidade || 'Não especificado';
-        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
-    });
-    
-    // Sort and get top 10
-    const sortedUnits = Object.entries(unitCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
-    
-    const labels = sortedUnits.map(([unit]) => unit);
-    const data = sortedUnits.map(([, count]) => count);
-    
-    barChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Ocorrências',
-                data: data,
-                backgroundColor: '#071d49',
-                borderColor: '#071d49',
-                borderWidth: 1,
-                borderRadius: 6,
-                hoverBackgroundColor: '#fac709'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 12,
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 1
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        color: '#666'
-                    },
-                    grid: {
-                        color: '#f0f2f5'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: '#666',
-                        maxRotation: 45,
-                        minRotation: 45
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Create doughnut chart - Item types
-function createDoughnutChart() {
-    const ctx = document.getElementById('doughnutChart');
-    if (!ctx) return;
-    
-    // Destroy existing chart
-    if (doughnutChart) {
-        doughnutChart.destroy();
-    }
-    
-    // Count by item type
-    const itemCounts = {};
-    allOccurrences.forEach(occ => {
-        const item = occ.itemApreendido?.item || 'Não especificado';
-        itemCounts[item] = (itemCounts[item] || 0) + 1;
-    });
-    
-    // Sort and get top 8
-    const sortedItems = Object.entries(itemCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8);
-    
-    const labels = sortedItems.map(([item]) => item);
-    const data = sortedItems.map(([, count]) => count);
-    
-    const colors = [
-        '#071d49',
-        '#279b4d',
-        '#fac709',
-        '#c33',
-        '#1976d2',
-        '#f57c00',
-        '#7b1fa2',
-        '#00897b'
-    ];
-    
-    doughnutChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors,
+                backgroundColor: colors.slice(0, labels.length),
                 borderColor: '#fff',
                 borderWidth: 2,
                 hoverOffset: 10
@@ -948,25 +887,26 @@ function createDoughnutChart() {
             maintainAspectRatio: true,
             plugins: {
                 legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 15,
-                        color: '#666',
-                        font: {
-                            size: 12
-                        },
-                        usePointStyle: true,
-                        pointStyle: 'circle'
-                    }
+                    display: false
                 },
                 tooltip: {
                     backgroundColor: '#071d49',
-                    padding: 12,
-                    titleColor: '#fff',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
                     bodyColor: '#fff',
                     borderColor: '#fac709',
-                    borderWidth: 1,
+                    borderWidth: 2,
+                    displayColors: false,
                     callbacks: {
+                        title: function() {
+                            return '';
+                        },
                         label: function(context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
@@ -978,5 +918,877 @@ function createDoughnutChart() {
                 }
             }
         }
+    });
+}
+
+// Create bar chart - Occurrences by day (last 7 days)
+function createBarChartDay() {
+    const ctx = document.getElementById('barChartDay');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (barChartDay) {
+        barChartDay.destroy();
+    }
+    
+    // Get last 7 days data
+    const last7Days = [];
+    const counts = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        last7Days.push(dateStr);
+        
+        const count = allOccurrences.filter(occ => {
+            if (!occ.metadata?.dataRegistro) return false;
+            const occDate = new Date(occ.metadata.dataRegistro);
+            return occDate.toDateString() === date.toDateString();
+        }).length;
+        counts.push(count);
+    }
+    
+    const total = counts.reduce((a, b) => a + b, 0);
+    
+    // Update total display
+    const totalElement = document.getElementById('totalDayOccurrences');
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+    
+    barChartDay = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: last7Days,
+            datasets: [{
+                label: 'Ocorrências',
+                data: counts,
+                backgroundColor: '#279b4d',
+                borderColor: '#279b4d',
+                borderWidth: 1,
+                borderRadius: 6,
+                hoverBackgroundColor: '#1f7d3d'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        color: '#666'
+                    },
+                    grid: {
+                        color: '#f0f2f5'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#666'
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create pie chart - Occurrences by unit with date filter
+function createPieChartUnidadePeriodo() {
+    const ctx = document.getElementById('pieChartUnidadePeriodo');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (pieChartUnidadePeriodo) {
+        pieChartUnidadePeriodo.destroy();
+    }
+    
+    // Determine date range
+    let startDate, endDate;
+    if (customDateRangeUnidade) {
+        startDate = customDateRangeUnidade.startDate;
+        endDate = customDateRangeUnidade.endDate;
+    } else {
+        // Default: last 30 days
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 29);
+    }
+    
+    // Filtrar ocorrências no período
+    const filteredOccs = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
+        const occDate = new Date(occ.metadata.dataRegistro);
+        return occDate >= startDate && occDate <= endDate;
+    });
+    
+    // Contar por unidade
+    const unitCounts = {};
+    filteredOccs.forEach(occ => {
+        const unit = occ.ocorrencia?.unidade || 'Não especificado';
+        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    
+    // Ordenar por quantidade
+    const sortedUnits = Object.entries(unitCounts)
+        .sort((a, b) => b[1] - a[1]);
+    
+    const labels = sortedUnits.map(([unit]) => unit);
+    const counts = sortedUnits.map(([, count]) => count);
+    const total = counts.reduce((a, b) => a + b, 0);
+    
+    // Update total display
+    const totalElement = document.getElementById('totalUnidadePeriodo');
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+    
+    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
+    
+    pieChartUnidadePeriodo = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 2,
+                    displayColors: false,
+                    callbacks: {
+                        title: function() {
+                            return '';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create pie chart - Item types with date filter
+function createPieChartItensPeriodo() {
+    const ctx = document.getElementById('pieChartItensPeriodo');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (pieChartItensPeriodo) {
+        pieChartItensPeriodo.destroy();
+    }
+    
+    // Determine date range
+    let startDate, endDate;
+    if (customDateRangeItens) {
+        startDate = customDateRangeItens.startDate;
+        endDate = customDateRangeItens.endDate;
+    } else {
+        // Default: last 30 days
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - 29);
+    }
+    
+    // Filtrar ocorrências no período
+    const filteredOccs = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
+        const occDate = new Date(occ.metadata.dataRegistro);
+        return occDate >= startDate && occDate <= endDate;
+    });
+    
+    // Contar por tipo de item
+    const itemCounts = {};
+    filteredOccs.forEach(occ => {
+        const item = occ.itemApreendido?.item || 'Não especificado';
+        itemCounts[item] = (itemCounts[item] || 0) + 1;
+    });
+    
+    // Ordenar por quantidade
+    const sortedItems = Object.entries(itemCounts)
+        .sort((a, b) => b[1] - a[1]);
+    
+    const labels = sortedItems.map(([item]) => item);
+    const counts = sortedItems.map(([, count]) => count);
+    const total = counts.reduce((a, b) => a + b, 0);
+    
+    // Update total display
+    const totalElement = document.getElementById('totalItensPeriodo');
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+    
+    const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
+    
+    pieChartItensPeriodo = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 2,
+                    displayColors: false,
+                    callbacks: {
+                        title: function() {
+                            return '';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create pie chart - Occurrences by unit by month
+function createPieChartUnidadeMes() {
+    const ctx = document.getElementById('pieChartUnidadeMes');
+    if (!ctx) return;
+    
+    if (pieChartUnidadeMes) {
+        pieChartUnidadeMes.destroy();
+    }
+    
+    const unitCounts = {};
+    allOccurrences.forEach(occ => {
+        const unit = occ.ocorrencia?.unidade || 'Não especificado';
+        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    
+    const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
+    const labels = sortedUnits.map(([unit]) => unit);
+    const data = sortedUnits.map(([, count]) => count);
+    const total = data.reduce((a, b) => a + b, 0);
+    
+    const totalElement = document.getElementById('totalUnidadeMes');
+    if (totalElement) totalElement.textContent = total;
+    
+    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
+    
+    pieChartUnidadeMes = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 2,
+                    displayColors: false,
+                    callbacks: {
+                        title: function() {
+                            return '';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create bar chart - Occurrences by unit by day (last 7 days)
+function createBarChartUnidadeDia() {
+    const ctx = document.getElementById('barChartUnidadeDia');
+    if (!ctx) return;
+    
+    if (barChartUnidadeDia) {
+        barChartUnidadeDia.destroy();
+    }
+    
+    // Filtrar ocorrências dos últimos 7 dias
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    
+    const last7DaysOccs = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
+        const occDate = new Date(occ.metadata.dataRegistro);
+        return occDate >= sevenDaysAgo && occDate <= now;
+    });
+    
+    // Agrupar por unidade
+    const unitCounts = {};
+    last7DaysOccs.forEach(occ => {
+        const unit = occ.ocorrencia?.unidade || 'Não especificado';
+        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    
+    const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
+    const labels = sortedUnits.map(([unit]) => unit);
+    const counts = sortedUnits.map(([, count]) => count);
+    const total = counts.reduce((a, b) => a + b, 0);
+    
+    const totalElement = document.getElementById('totalUnidadeDia');
+    if (totalElement) totalElement.textContent = total;
+    
+    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
+    
+    barChartUnidadeDia = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ocorrências',
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1, color: '#666' }, grid: { color: '#f0f2f5' } },
+                x: { ticks: { color: '#666' }, grid: { display: false } }
+            }
+        }
+    });
+}
+
+// Create pie chart - Items by month
+function createPieChartItensMes() {
+    const ctx = document.getElementById('pieChartItensMes');
+    if (!ctx) return;
+    
+    if (pieChartItensMes) {
+        pieChartItensMes.destroy();
+    }
+    
+    const itemCounts = {};
+    allOccurrences.forEach(occ => {
+        const item = occ.itemApreendido?.item || 'Não especificado';
+        itemCounts[item] = (itemCounts[item] || 0) + 1;
+    });
+    
+    const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
+    const labels = sortedItems.map(([item]) => item);
+    const data = sortedItems.map(([, count]) => count);
+    const total = data.reduce((a, b) => a + b, 0);
+    
+    const totalElement = document.getElementById('totalItensMes');
+    if (totalElement) totalElement.textContent = total;
+    
+    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#1976d2', '#f57c00', '#7b1fa2', '#00897b', '#00bcd4', '#ff9800'];
+    
+    pieChartItensMes = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 2,
+                    displayColors: false,
+                    callbacks: {
+                        title: function() {
+                            return '';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create bar chart - Items by day (last 7 days)
+function createBarChartItensDia() {
+    const ctx = document.getElementById('barChartItensDia');
+    if (!ctx) return;
+    
+    if (barChartItensDia) {
+        barChartItensDia.destroy();
+    }
+    
+    // Filtrar ocorrências dos últimos 7 dias
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    
+    const last7DaysOccs = allOccurrences.filter(occ => {
+        if (!occ.metadata?.dataRegistro) return false;
+        const occDate = new Date(occ.metadata.dataRegistro);
+        return occDate >= sevenDaysAgo && occDate <= now;
+    });
+    
+    // Agrupar por tipo de item
+    const itemCounts = {};
+    last7DaysOccs.forEach(occ => {
+        const item = occ.itemApreendido?.item || 'Não especificado';
+        itemCounts[item] = (itemCounts[item] || 0) + 1;
+    });
+    
+    const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
+    const labels = sortedItems.map(([item]) => item);
+    const counts = sortedItems.map(([, count]) => count);
+    const total = counts.reduce((a, b) => a + b, 0);
+    
+    const totalElement = document.getElementById('totalItensDia');
+    if (totalElement) totalElement.textContent = total;
+    
+    const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
+    
+    barChartItensDia = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ocorrências',
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1, color: '#666' }, grid: { color: '#f0f2f5' } },
+                x: { ticks: { color: '#666' }, grid: { display: false } }
+            }
+        }
+    });
+}
+
+// Create pie chart - Occurrences by month
+function createPieChartMonth() {
+    const ctx = document.getElementById('pieChartMonth');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (pieChartMonth) {
+        pieChartMonth.destroy();
+    }
+    
+    // Count by month
+    const monthCounts = {};
+    const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    
+    // Initialize all months with 0
+    monthNames.forEach(month => {
+        monthCounts[month] = 0;
+    });
+    
+    // Count occurrences by month
+    allOccurrences.forEach(occ => {
+        if (occ.metadata?.dataRegistro) {
+            const occDate = new Date(occ.metadata.dataRegistro);
+            const monthName = monthNames[occDate.getMonth()];
+            monthCounts[monthName]++;
+        }
+    });
+    
+    // Filter out months with 0 occurrences and sort by month order
+    const sortedData = monthNames
+        .map(month => ({ month, count: monthCounts[month] }))
+        .filter(item => item.count > 0);
+    
+    const labels = sortedData.map(item => item.month);
+    const data = sortedData.map(item => item.count);
+    const total = data.reduce((a, b) => a + b, 0);
+    
+    // Update total display
+    const totalElement = document.getElementById('totalMonthOccurrences');
+    if (totalElement) {
+        totalElement.textContent = total;
+    }
+    
+    // Colors for each month
+    const colors = [
+        '#279b4d', '#071d49', '#fac709', '#c33',
+        '#00bcd4', '#ff9800', '#9c27b0', '#4caf50',
+        '#f44336', '#2196f3', '#ff5722', '#795548'
+    ];
+    
+    pieChartMonth = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.slice(0, labels.length),
+                borderColor: '#fff',
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#071d49',
+                    padding: 16,
+                    titleFont: {
+                        size: 0
+                    },
+                    bodyFont: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    bodyColor: '#fff',
+                    borderColor: '#fac709',
+                    borderWidth: 2,
+                    displayColors: false,
+                    callbacks: {
+                        title: function() {
+                            return '';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ==================== FILTRO DE DATA PERSONALIZADA ====================
+
+// Função para validar data no formato brasileiro
+function isValidDateFilter(dateString) {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = dateString.match(regex);
+    
+    if (!match) return false;
+    
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const year = parseInt(match[3], 10);
+    
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && 
+           date.getMonth() === month - 1 && 
+           date.getDate() === day;
+}
+
+// Função para converter data brasileira para objeto Date
+function brDateToDateObj(brDate) {
+    const [day, month, year] = brDate.split('/');
+    return new Date(year, month - 1, day);
+}
+
+// Aplicar máscara de data nos campos de filtro
+function applyDateMaskFilter(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (value.length >= 5) {
+        value = value.substring(0, 5) + '/' + value.substring(5, 9);
+    }
+    
+    e.target.value = value;
+}
+
+// Event listeners para máscaras de data
+if (filterDataInicio) {
+    filterDataInicio.addEventListener('input', applyDateMaskFilter);
+}
+
+if (filterDataFim) {
+    filterDataFim.addEventListener('input', applyDateMaskFilter);
+}
+
+// Filtrar gráfico por data personalizada
+if (btnFilterChart) {
+    btnFilterChart.addEventListener('click', () => {
+        const dataInicio = filterDataInicio.value;
+        const dataFim = filterDataFim.value;
+        
+        if (!dataInicio || !dataFim) {
+            customAlert.error('Por favor, preencha ambas as datas');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataInicio)) {
+            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataFim)) {
+            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        const startDate = brDateToDateObj(dataInicio);
+        const endDate = brDateToDateObj(dataFim);
+        
+        if (startDate > endDate) {
+            customAlert.error('A data de início deve ser anterior à data de fim');
+            return;
+        }
+        
+        customDateRange = { startDate, endDate };
+        createLineChart();
+    });
+}
+
+// Resetar filtro para últimos 30 dias
+if (btnResetFilter) {
+    btnResetFilter.addEventListener('click', () => {
+        customDateRange = null;
+        filterDataInicio.value = '';
+        filterDataFim.value = '';
+        createLineChart();
+    });
+}
+
+// ==================== FILTRO DE DATA PARA UNIDADE ====================
+
+// Event listeners para máscaras de data - Unidade
+if (filterDataInicioUnidade) {
+    filterDataInicioUnidade.addEventListener('input', applyDateMaskFilter);
+}
+
+if (filterDataFimUnidade) {
+    filterDataFimUnidade.addEventListener('input', applyDateMaskFilter);
+}
+
+// Filtrar gráfico de Unidade por data personalizada
+if (btnFilterChartUnidade) {
+    btnFilterChartUnidade.addEventListener('click', () => {
+        const dataInicio = filterDataInicioUnidade.value;
+        const dataFim = filterDataFimUnidade.value;
+        
+        if (!dataInicio || !dataFim) {
+            customAlert.error('Por favor, preencha ambas as datas');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataInicio)) {
+            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataFim)) {
+            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        const startDate = brDateToDateObj(dataInicio);
+        const endDate = brDateToDateObj(dataFim);
+        
+        if (startDate > endDate) {
+            customAlert.error('A data de início deve ser anterior à data de fim');
+            return;
+        }
+        
+        customDateRangeUnidade = { startDate, endDate };
+        createPieChartUnidade();
+    });
+}
+
+// Resetar filtro de Unidade
+if (btnResetFilterUnidade) {
+    btnResetFilterUnidade.addEventListener('click', () => {
+        customDateRangeUnidade = null;
+        filterDataInicioUnidade.value = '';
+        filterDataFimUnidade.value = '';
+        createPieChartUnidade();
+    });
+}
+
+// ==================== FILTRO DE DATA PARA ITENS ====================
+
+// Event listeners para máscaras de data - Itens
+if (filterDataInicioItens) {
+    filterDataInicioItens.addEventListener('input', applyDateMaskFilter);
+}
+
+if (filterDataFimItens) {
+    filterDataFimItens.addEventListener('input', applyDateMaskFilter);
+}
+
+// Filtrar gráfico de Itens por data personalizada
+if (btnFilterChartItens) {
+    btnFilterChartItens.addEventListener('click', () => {
+        const dataInicio = filterDataInicioItens.value;
+        const dataFim = filterDataFimItens.value;
+        
+        if (!dataInicio || !dataFim) {
+            customAlert.error('Por favor, preencha ambas as datas');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataInicio)) {
+            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        if (!isValidDateFilter(dataFim)) {
+            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
+            return;
+        }
+        
+        const startDate = brDateToDateObj(dataInicio);
+        const endDate = brDateToDateObj(dataFim);
+        
+        if (startDate > endDate) {
+            customAlert.error('A data de início deve ser anterior à data de fim');
+            return;
+        }
+        
+        customDateRangeItens = { startDate, endDate };
+        createPieChartItens();
+    });
+}
+
+// Resetar filtro de Itens
+if (btnResetFilterItens) {
+    btnResetFilterItens.addEventListener('click', () => {
+        customDateRangeItens = null;
+        filterDataInicioItens.value = '';
+        filterDataFimItens.value = '';
+        createPieChartItens();
     });
 }
