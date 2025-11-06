@@ -24,8 +24,21 @@ window.addEventListener('load', () => {
         userInfo.textContent = `${username}`;
     }
     
-    // Inicializar calendários Flatpickr
-    initializeDatePickers();
+    // Inicializar calendários Flatpickr após um pequeno delay
+    setTimeout(() => {
+        console.log('Iniciando calendários...');
+        initializeDatePickers();
+    }, 500);
+    
+    // Definir data atual no campo de data de apreensão se estiver vazio
+    const dataApreensaoField = document.getElementById('dataApreensao');
+    if (dataApreensaoField && !dataApreensaoField.value) {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        dataApreensaoField.value = `${day}/${month}/${year}`;
+    }
 });
 
 // Submit do formulário
@@ -35,6 +48,7 @@ occurrenceForm.addEventListener('submit', async (e) => {
     // Validar datas antes de enviar
     const dataApreensao = document.getElementById('dataApreensao').value;
     const dataNascimento = document.getElementById('dataNascimento').value;
+    const numeroGenesis = document.getElementById('numeroGenesis').value;
     
     if (!isValidDate(dataApreensao)) {
         showError('Data de apreensão inválida. Use o formato dd/mm/aaaa');
@@ -43,6 +57,13 @@ occurrenceForm.addEventListener('submit', async (e) => {
     
     if (!isValidDate(dataNascimento)) {
         showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
+        return;
+    }
+    
+    // Validar formato do número Genesis (deve ter 6 números + hífen + 4 dígitos do ano)
+    const genesisPattern = /^\d{6}-\d{4}$/;
+    if (!genesisPattern.test(numeroGenesis)) {
+        showError('Número Genesis inválido. Deve conter 6 números seguidos de hífen e ano (ex: 123456-2025)');
         return;
     }
     
@@ -183,18 +204,96 @@ function clearForm() {
     document.getElementById('numeroGenesis').focus();
 }
 
-// Máscara para data no formato brasileiro (dd/mm/aaaa)
+// Máscara avançada para data no formato brasileiro (dd/mm/aaaa)
 function applyDateMask(e) {
-    let value = e.target.value.replace(/\D/g, '');
+    let value = e.target.value;
     
-    if (value.length >= 2) {
-        value = value.substring(0, 2) + '/' + value.substring(2);
+    // Permitir apenas números e barras
+    value = value.replace(/[^\d\/]/g, '');
+    
+    // Remover barras extras
+    value = value.replace(/\/+/g, '/');
+    
+    // Aplicar formatação automática
+    let numbers = value.replace(/\D/g, '');
+    
+    if (numbers.length >= 2) {
+        let day = numbers.substring(0, 2);
+        let month = numbers.substring(2, 4);
+        let year = numbers.substring(4, 8);
+        
+        // Validar dia (01-31)
+        if (parseInt(day) > 31) {
+            day = '31';
+        }
+        if (parseInt(day) < 1 && day.length === 2) {
+            day = '01';
+        }
+        
+        // Validar mês (01-12)
+        if (month.length > 0) {
+            if (parseInt(month) > 12) {
+                month = '12';
+            }
+            if (parseInt(month) < 1 && month.length === 2) {
+                month = '01';
+            }
+        }
+        
+        // Montar a data formatada
+        value = day;
+        if (month.length > 0) {
+            value += '/' + month;
+        }
+        if (year.length > 0) {
+            value += '/' + year;
+        }
+    } else {
+        value = numbers;
     }
-    if (value.length >= 5) {
-        value = value.substring(0, 5) + '/' + value.substring(5, 9);
+    
+    // Limitar o comprimento total
+    if (value.length > 10) {
+        value = value.substring(0, 10);
     }
     
     e.target.value = value;
+}
+
+// Função para filtrar entrada de teclas em campos de data
+function filterDateInput(e) {
+    const key = e.key;
+    const value = e.target.value;
+    
+    // Permitir teclas de controle
+    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+        return true;
+    }
+    
+    // Permitir Ctrl+A, Ctrl+C, Ctrl+V, etc.
+    if (e.ctrlKey || e.metaKey) {
+        return true;
+    }
+    
+    // Permitir apenas números e barra
+    if (!/[\d\/]/.test(key)) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Não permitir mais de 2 barras
+    if (key === '/' && (value.match(/\//g) || []).length >= 2) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Não permitir mais de 10 caracteres
+    if (value.length >= 10 && !['Backspace', 'Delete'].includes(key)) {
+        e.preventDefault();
+        return false;
+    }
+    
+    return true;
 }
 
 // Validar data no formato brasileiro
@@ -211,10 +310,50 @@ function isValidDate(dateString) {
     if (month < 1 || month > 12) return false;
     if (day < 1 || day > 31) return false;
     
+    // Validar dias por mês
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    
+    // Verificar ano bissexto
+    if (month === 2 && isLeapYear(year)) {
+        daysInMonth[1] = 29;
+    }
+    
+    if (day > daysInMonth[month - 1]) return false;
+    
     const date = new Date(year, month - 1, day);
     return date.getFullYear() === year && 
            date.getMonth() === month - 1 && 
            date.getDate() === day;
+}
+
+// Verificar se é ano bissexto
+function isLeapYear(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+// Validar data parcial durante a digitação
+function validatePartialDate(value) {
+    const parts = value.split('/');
+    
+    if (parts.length >= 1) {
+        const day = parseInt(parts[0]);
+        if (parts[0].length === 2 && (day < 1 || day > 31)) {
+            return false;
+        }
+    }
+    
+    if (parts.length >= 2) {
+        const month = parseInt(parts[1]);
+        if (parts[1].length === 2 && (month < 1 || month > 12)) {
+            return false;
+        }
+    }
+    
+    if (parts.length === 3 && parts[2].length === 4) {
+        return isValidDate(value);
+    }
+    
+    return true;
 }
 
 // Converter data brasileira para ISO (yyyy-mm-dd)
@@ -223,9 +362,156 @@ function brDateToISO(brDate) {
     return `${year}-${month}-${day}`;
 }
 
-// Função vazia para manter compatibilidade
+// Inicializar calendários Flatpickr
 function initializeDatePickers() {
-    // Calendário removido
+    // Usar Flatpickr global (carregado via script tag)
+    if (typeof flatpickr !== 'undefined') {
+        console.log('Flatpickr disponível globalmente');
+    
+    // Configurar calendário para data de apreensão
+    const dataApreensaoField = document.getElementById('dataApreensao');
+    if (dataApreensaoField) {
+        const fpInstance = window.flatpickr(dataApreensaoField, {
+            locale: window.flatpickr.l10ns.pt || 'default',
+            dateFormat: 'd/m/Y',
+            defaultDate: new Date(),
+            allowInput: true,
+            clickOpens: true,
+            disableMobile: false,
+            onChange: function(selectedDates, dateStr, instance) {
+                console.log('Data de apreensão selecionada:', dateStr);
+                // Atualizar o número Genesis quando a data mudar
+                updateGenesisWithYear();
+            },
+            onClose: function(selectedDates, dateStr, instance) {
+                // Validar a data quando o calendário fechar
+                if (dateStr && !isValidDate(dateStr)) {
+                    showError('Data inválida. Use o formato dd/mm/aaaa');
+                    instance.clear();
+                }
+            }
+        });
+        
+        // Adicionar filtros para entrada manual
+        dataApreensaoField.addEventListener('keydown', filterDateInput);
+        dataApreensaoField.addEventListener('input', function(e) {
+            // Só aplicar máscara se não for um evento do Flatpickr
+            if (!fpInstance.isOpen) {
+                applyDateMask(e);
+                
+                // Validar data parcial e dar feedback visual
+                const value = e.target.value;
+                if (value.length >= 8) {
+                    if (validatePartialDate(value)) {
+                        e.target.style.borderColor = '';
+                        e.target.style.backgroundColor = '';
+                    } else {
+                        e.target.style.borderColor = '#f44336';
+                        e.target.style.backgroundColor = '#ffebee';
+                    }
+                }
+                
+                updateGenesisWithYear();
+            }
+        });
+    }
+    
+    // Configurar calendário para data de nascimento
+    const dataNascimentoField = document.getElementById('dataNascimento');
+    console.log('Campo dataNascimento encontrado:', !!dataNascimentoField);
+    if (dataNascimentoField) {
+        const fpInstanceNasc = window.flatpickr(dataNascimentoField, {
+            locale: window.flatpickr.l10ns.pt || 'default',
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            clickOpens: true,
+            maxDate: new Date(),
+            disableMobile: false,
+            onChange: function(selectedDates, dateStr, instance) {
+                console.log('Data de nascimento selecionada:', dateStr);
+                // Remover estilos de erro se houver
+                instance.input.style.borderColor = '';
+                instance.input.style.backgroundColor = '';
+            },
+            onOpen: function(selectedDates, dateStr, instance) {
+                console.log('Calendário de nascimento aberto');
+            },
+            onClose: function(selectedDates, dateStr, instance) {
+                console.log('Calendário de nascimento fechado');
+                if (dateStr && !isValidDate(dateStr)) {
+                    showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
+                    instance.clear();
+                }
+            }
+        });
+        
+        // Configurar eventos após a inicialização do Flatpickr
+        setTimeout(() => {
+            // Event listener para digitação manual
+            dataNascimentoField.addEventListener('keydown', function(e) {
+                if (!fpInstanceNasc.isOpen) {
+                    filterDateInputSimple(e);
+                }
+            });
+            
+            dataNascimentoField.addEventListener('input', function(e) {
+                if (!fpInstanceNasc.isOpen) {
+                    applySimpleDateMask(e);
+                }
+            });
+        }, 100);
+        
+        // Validar quando sair do campo
+        dataNascimentoField.addEventListener('blur', function(e) {
+            const value = e.target.value;
+            if (value.length === 10) {
+                if (isValidDate(value)) {
+                    e.target.style.borderColor = '';
+                    e.target.style.backgroundColor = '';
+                } else {
+                    e.target.style.borderColor = '#f44336';
+                    e.target.style.backgroundColor = '#ffebee';
+                    showError('Data de nascimento inválida. Verifique o formato dd/mm/aaaa');
+                }
+            }
+        });
+    }
+    } else {
+        console.log('Flatpickr não disponível, usando apenas máscaras');
+        // Fallback: manter funcionalidade de máscara manual
+        document.getElementById('dataApreensao').addEventListener('input', applyDateMask);
+        document.getElementById('dataNascimento').addEventListener('input', applySimpleDateMask);
+    }
+}
+
+// Função alternativa para usar Flatpickr global
+function initializeFlatpickrGlobal() {
+    const flatpickr = window.flatpickr;
+    
+    // Data de apreensão
+    const dataApreensaoField = document.getElementById('dataApreensao');
+    if (dataApreensaoField) {
+        flatpickr(dataApreensaoField, {
+            dateFormat: 'd/m/Y',
+            defaultDate: new Date(),
+            allowInput: true,
+            clickOpens: true
+        });
+    }
+    
+    // Data de nascimento
+    const dataNascimentoField = document.getElementById('dataNascimento');
+    if (dataNascimentoField) {
+        flatpickr(dataNascimentoField, {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            clickOpens: true,
+            maxDate: new Date()
+        });
+        
+        // Adicionar máscara para digitação manual
+        dataNascimentoField.addEventListener('input', applySimpleDateMask);
+    }
 }
 
 // Função para formatar CPF: 000.000.000-00
@@ -305,39 +591,173 @@ document.getElementById('tipoDocumento').addEventListener('change', function(e) 
     }
 });
 
+// Função para formatar automaticamente o Nº Genesis
+function formatGenesisNumber(input) {
+    let value = input.replace(/\D/g, ''); // Remove tudo que não é número
+    
+    // Se tem mais de 6 dígitos, mantém apenas os primeiros 6
+    if (value.length > 6) {
+        value = value.substring(0, 6);
+    }
+    
+    return value;
+}
+
 // Função para atualizar o Nº Genesis com o ano automaticamente
 function updateGenesisWithYear() {
     const dataApreensao = document.getElementById('dataApreensao').value;
     const numeroGenesis = document.getElementById('numeroGenesis');
+    let currentValue = numeroGenesis.value;
     
-    // Verificar se a data está completa (dd/mm/aaaa)
+    // Extrair apenas os números do campo Genesis
+    let genesisNumbers = formatGenesisNumber(currentValue);
+    
+    // Determinar o ano a ser usado
+    let yearToUse = new Date().getFullYear(); // Ano atual por padrão
+    
+    // Se a data de apreensão está preenchida e válida, usar o ano dela
     if (dataApreensao.length === 10 && isValidDate(dataApreensao)) {
-        const year = dataApreensao.split('/')[2]; // Extrair o ano
-        const currentValue = numeroGenesis.value;
-        
-        // Remover ano anterior se existir (formato: xxxx-yyyy)
-        const valueWithoutYear = currentValue.replace(/-\d{4}$/, '');
-        
-        // Adicionar o novo ano
-        if (valueWithoutYear) {
-            numeroGenesis.value = valueWithoutYear + '-' + year;
+        yearToUse = parseInt(dataApreensao.split('/')[2]);
+    }
+    
+    // Se tem 6 dígitos, adicionar o hífen e o ano
+    if (genesisNumbers.length === 6) {
+        const newValue = genesisNumbers + '-' + yearToUse;
+        if (numeroGenesis.value !== newValue) {
+            numeroGenesis.value = newValue;
+            
+            // Adicionar feedback visual temporário
+            numeroGenesis.style.backgroundColor = '#e8f5e9';
+            numeroGenesis.style.borderColor = '#4caf50';
+            setTimeout(() => {
+                numeroGenesis.style.backgroundColor = '';
+                numeroGenesis.style.borderColor = '';
+            }, 1000);
         }
+    } else if (genesisNumbers.length > 0 && genesisNumbers.length < 6) {
+        // Se tem menos de 6 dígitos, mostrar apenas os números
+        numeroGenesis.value = genesisNumbers;
     }
 }
 
-// Atualizar Nº Genesis quando a data de apreensão mudar
-document.getElementById('dataApreensao').addEventListener('input', function(e) {
-    applyDateMask(e);
-    updateGenesisWithYear();
-});
+// Event listener removido - agora está integrado no Flatpickr
 
 // Atualizar Nº Genesis quando o número for digitado
 document.getElementById('numeroGenesis').addEventListener('input', function(e) {
+    // Aplicar formatação em tempo real
+    const cursorPosition = e.target.selectionStart;
+    const oldValue = e.target.value;
+    
     updateGenesisWithYear();
+    
+    // Manter o cursor na posição correta após a formatação
+    const newValue = e.target.value;
+    if (oldValue !== newValue) {
+        // Se o valor mudou (foi formatado), ajustar a posição do cursor
+        let newCursorPosition = cursorPosition;
+        if (newValue.includes('-') && !oldValue.includes('-')) {
+            // Se o hífen foi adicionado, não mover o cursor
+            if (cursorPosition > 6) {
+                newCursorPosition = newValue.length;
+            }
+        }
+        setTimeout(() => {
+            e.target.setSelectionRange(newCursorPosition, newCursorPosition);
+        }, 0);
+    }
 });
 
-// Aplicar máscara de data ao campo de data de nascimento
-document.getElementById('dataNascimento').addEventListener('input', applyDateMask);
+// Adicionar placeholder e dica visual nos campos
+document.addEventListener('DOMContentLoaded', function() {
+    const genesisField = document.getElementById('numeroGenesis');
+    if (genesisField) {
+        genesisField.placeholder = 'Digite os 6 números (ex: 123456)';
+        genesisField.title = 'Digite apenas os 6 números do GENESIS. O ano será adicionado automaticamente.';
+        
+        // Limitar a 11 caracteres (6 números + hífen + 4 dígitos do ano)
+        genesisField.maxLength = 11;
+        
+        // Tratar evento de colar (paste)
+        genesisField.addEventListener('paste', function(e) {
+            e.preventDefault();
+            
+            // Obter o texto colado
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Extrair apenas números
+            const numbersOnly = pastedText.replace(/\D/g, '');
+            
+            // Se tem exatamente 6 números, usar a função de formatação
+            if (numbersOnly.length >= 6) {
+                const genesisNumbers = numbersOnly.substring(0, 6);
+                this.value = genesisNumbers;
+                updateGenesisWithYear();
+            } else {
+                // Se tem menos de 6 números, apenas inserir os números
+                this.value = numbersOnly;
+            }
+        });
+    }
+    
+    // Configurar campo de data de nascimento
+    const dataNascField = document.getElementById('dataNascimento');
+    if (dataNascField) {
+        dataNascField.placeholder = 'dd/mm/aaaa ou clique para calendário';
+        dataNascField.title = 'Digite diretamente (barras automáticas) ou clique no ícone para abrir o calendário';
+        dataNascField.maxLength = 10;
+    }
+});
+
+// Máscara simples para data de nascimento - adiciona barras automaticamente
+function applySimpleDateMask(e) {
+    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+    
+    // Limitar a 8 dígitos
+    if (value.length > 8) {
+        value = value.substring(0, 8);
+    }
+    
+    // Adicionar barras automaticamente
+    if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (value.length >= 5) {
+        value = value.substring(0, 5) + '/' + value.substring(5);
+    }
+    
+    e.target.value = value;
+}
+
+// Filtro simples de teclas para data de nascimento
+function filterDateInputSimple(e) {
+    const key = e.key;
+    
+    // Permitir teclas de controle
+    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+        return true;
+    }
+    
+    // Permitir Ctrl+A, Ctrl+C, Ctrl+V, etc.
+    if (e.ctrlKey || e.metaKey) {
+        return true;
+    }
+    
+    // Permitir apenas números
+    if (!/\d/.test(key)) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Não permitir mais de 10 caracteres (incluindo as barras)
+    if (e.target.value.length >= 10) {
+        e.preventDefault();
+        return false;
+    }
+    
+    return true;
+}
+
+// Event listeners para data de nascimento foram movidos para dentro da configuração do Flatpickr
 
 // Navigation tab events
 tabDashboard.addEventListener('click', () => {

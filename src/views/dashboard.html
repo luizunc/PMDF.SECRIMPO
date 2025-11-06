@@ -329,7 +329,10 @@
                     <table class="occurrences-table">
                         <thead>
                             <tr>
-                                <th>Nº Genesis</th>
+                                <th>
+                                    Nº Genesis 
+                                    <span class="attachment-header-info" title="📎 = Possui anexos PDF">📎</span>
+                                </th>
                                 <th>Data</th>
                                 <th>Unidade</th>
                                 <th>Proprietário</th>
@@ -440,6 +443,50 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="btnCancelPrint">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Anexar PDF -->
+    <div class="modal" id="attachModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Anexar PDF</h2>
+                <button class="modal-close" id="attachModalClose">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="attach-info">
+                    <strong>Ocorrência:</strong> <span id="attachOccurrenceId"></span>
+                </p>
+                <div class="file-upload-area">
+                    <div class="upload-zone" onclick="document.getElementById('pdfFileInput').click()">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-15"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <p>Clique para selecionar um arquivo PDF</p>
+                        <p class="file-info">Máximo 10MB</p>
+                    </div>
+                    <input type="file" id="pdfFileInput" accept=".pdf" style="display: none;">
+                    <div class="selected-file">
+                        <span id="selectedFileName">Nenhum arquivo selecionado</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btnCancelAttach">Cancelar</button>
+                <button class="btn-primary" id="btnUploadPDF" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49"/>
+                    </svg>
+                    Anexar PDF
+                </button>
             </div>
         </div>
     </div>

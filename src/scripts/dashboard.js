@@ -53,11 +53,23 @@ const printOccurrenceId = document.getElementById('printOccurrenceId');
 const btnCancelPrint = document.getElementById('btnCancelPrint');
 const btnPrintTermoApreensao = document.getElementById('btnPrintTermoApreensao');
 
+const attachModal = document.getElementById('attachModal');
+const attachModalClose = document.getElementById('attachModalClose');
+const attachOccurrenceId = document.getElementById('attachOccurrenceId');
+const btnCancelAttach = document.getElementById('btnCancelAttach');
+// btnSelectPDF removido - não existe no HTML
+const pdfFileInput = document.getElementById('pdfFileInput');
+const selectedFileName = document.getElementById('selectedFileName');
+const btnUploadPDF = document.getElementById('btnUploadPDF');
+
 // State
 let allOccurrences = [];
 let filteredOccurrences = [];
 let currentOccurrence = null;
 let isEditMode = false;
+
+// Cache para anexos
+let attachmentsCache = new Map();
 
 // Charts - Ocorrências Gerais
 let lineChart = null;
@@ -126,7 +138,7 @@ async function loadOccurrences() {
                 if (row.ocorrencia && row.itemApreendido && row.proprietario && row.policial) {
                     return row;
                 }
-                
+
                 // Caso contrário, mapeia da estrutura do Google Sheets
                 return {
                     ocorrencia: {
@@ -165,7 +177,7 @@ async function loadOccurrences() {
                     }
                 };
             });
-            
+
             filteredOccurrences = [...allOccurrences];
             console.log('Ocorrências carregadas:', allOccurrences.length);
             updateStats();
@@ -190,8 +202,8 @@ function updateStats() {
     const thisMonth = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate.getMonth() === now.getMonth() && 
-               occDate.getFullYear() === now.getFullYear();
+        return occDate.getMonth() === now.getMonth() &&
+            occDate.getFullYear() === now.getFullYear();
     }).length;
     statMes.textContent = thisMonth;
 
@@ -202,10 +214,10 @@ function updateStats() {
         return occDate.toDateString() === now.toDateString();
     }).length;
     statHoje.textContent = today;
-    
+
     // Update active users count from KeyAuth
     updateActiveUsers();
-    
+
     // Update charts
     updateCharts();
 }
@@ -241,12 +253,28 @@ function renderTable() {
     }
 
     hideEmptyState();
-    occurrencesTableBody.innerHTML = '';
+
+    // Otimização: usar DocumentFragment para reduzir reflows
+    const fragment = document.createDocumentFragment();
+
+    // Limpar tabela de forma otimizada
+    while (occurrencesTableBody.firstChild) {
+        occurrencesTableBody.removeChild(occurrencesTableBody.firstChild);
+    }
 
     filteredOccurrences.forEach((occ, index) => {
         const row = document.createElement('tr');
+        
+        // Indicador de anexos (será atualizado dinamicamente)
+        const attachmentIndicator = `<span class="attachment-indicator" id="attachment-${index}"></span>`;
+        
         row.innerHTML = `
-            <td><strong>${occ.ocorrencia?.numeroGenesis || 'N/A'}</strong></td>
+            <td>
+                <div class="occurrence-number">
+                    <strong>${occ.ocorrencia?.numeroGenesis || 'N/A'}</strong>
+                    ${attachmentIndicator}
+                </div>
+            </td>
             <td>${occ.ocorrencia?.dataApreensao ? formatDate(occ.ocorrencia.dataApreensao) : 'N/A'}</td>
             <td>${occ.ocorrencia?.unidade || 'N/A'}</td>
             <td>${occ.proprietario?.nome || 'N/A'}</td>
@@ -271,6 +299,7 @@ function renderTable() {
                             <rect x="6" y="14" width="12" height="8"/>
                         </svg>
                     </button>
+
                     <button class="btn-action btn-delete-action" onclick="confirmDelete(${index})" title="Excluir">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
@@ -280,32 +309,41 @@ function renderTable() {
                 </div>
             </td>
         `;
-        occurrencesTableBody.appendChild(row);
+        fragment.appendChild(row);
     });
+
+    // Adicionar todas as linhas de uma vez para reduzir reflows
+    occurrencesTableBody.appendChild(fragment);
+    
+    // Verificar anexos para cada ocorrência
+    checkAttachmentsForAllOccurrences();
 }
 
 // View occurrence
-window.viewOccurrence = function(index) {
+window.viewOccurrence = function (index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = false;
     showModal(false);
 };
 
 // Edit occurrence
-window.editOccurrence = function(index) {
+window.editOccurrence = function (index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = true;
     showModal(true);
 };
 
-// Show modal
+// Show modal 
 function showModal(editable) {
     if (!currentOccurrence) return;
 
-    const modalTitle = document.getElementById('modalTitle');
-    modalTitle.textContent = editable ? 'Editar Ocorrência' : 'Detalhes da Ocorrência';
+    // Usar requestAnimationFrame para melhor performance
+    requestAnimationFrame(() => {
 
-    modalBody.innerHTML = `
+        const modalTitle = document.getElementById('modalTitle');
+        modalTitle.textContent = editable ? 'Editar Ocorrência' : 'Detalhes da Ocorrência';
+
+        modalBody.innerHTML = `
         <div class="modal-form-section">
             <h3 class="modal-section-title">Dados da Ocorrência</h3>
             <div class="modal-form-grid">
@@ -424,19 +462,284 @@ function showModal(editable) {
                 </div>
             </div>
         </div>
+
+        <div class="modal-form-section">
+            <h3 class="modal-section-title">Anexos PDF</h3>
+            <div class="attachments-list" id="attachmentsList">
+                <div class="loading-attachments">
+                    <span>Carregando anexos...</span>
+                </div>
+            </div>
+            ${!editable ? `
+                <div class="attachment-actions">
+                    <button type="button" class="btn-primary btn-attach-new" onclick="openAttachModal(${filteredOccurrences.indexOf(currentOccurrence)})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49"/>
+                        </svg>
+                        Anexar PDF
+                    </button>
+                </div>
+            ` : ''}
+        </div>
     `;
 
-    btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
-    btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
-    
-    viewModal.classList.add('active');
+        btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
+        btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
+
+        viewModal.classList.add('active');
+
+        // Carregar anexos após abrir o modal
+        if (!editable) {
+            loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
+        }
+    });
 }
 
-// Close modal
+// Load attachments from Google Drive
+async function loadAttachments(numeroGenesis) {
+    const attachmentsList = document.getElementById('attachmentsList');
+    if (!attachmentsList) return;
+
+    try {
+        console.log('Carregando anexos para:', numeroGenesis);
+
+        // Mostrar loading
+        attachmentsList.innerHTML = '<div class="loading-attachments"><span>Carregando anexos...</span></div>';
+
+        // Buscar anexos no Google Drive
+        const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
+
+        console.log('Anexos carregados:', result);
+
+        if (result.success && result.attachments.length > 0) {
+            attachmentsList.innerHTML = generateAttachmentsList(result.attachments);
+        } else {
+            attachmentsList.innerHTML = '<p class="no-attachments">Nenhum anexo PDF encontrado.</p>';
+        }
+
+    } catch (error) {
+        console.error('Erro ao carregar anexos:', error);
+        attachmentsList.innerHTML = '<p class="no-attachments error">Erro ao carregar anexos.</p>';
+    }
+}
+
+// Check attachments for all occurrences in the table
+async function checkAttachmentsForAllOccurrences() {
+    const promises = filteredOccurrences.map(async (occ, index) => {
+        try {
+            const numeroGenesis = occ.ocorrencia?.numeroGenesis;
+            if (!numeroGenesis) return;
+
+            const indicator = document.getElementById(`attachment-${index}`);
+            if (!indicator) return;
+
+            // Verificar cache primeiro
+            if (attachmentsCache.has(numeroGenesis)) {
+                const cachedResult = attachmentsCache.get(numeroGenesis);
+                updateIndicatorDisplay(indicator, cachedResult);
+                return;
+            }
+
+            const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
+            
+            // Salvar no cache
+            attachmentsCache.set(numeroGenesis, result);
+            
+            updateIndicatorDisplay(indicator, result);
+        } catch (error) {
+            console.error('Erro ao verificar anexos:', error);
+            const indicator = document.getElementById(`attachment-${index}`);
+            if (indicator) {
+                // Em caso de erro, simplesmente ocultar o indicador
+                indicator.style.display = 'none';
+            }
+        }
+    });
+
+    // Executar verificações em lotes para melhor performance
+    const batchSize = 5;
+    for (let i = 0; i < promises.length; i += batchSize) {
+        const batch = promises.slice(i, i + batchSize);
+        await Promise.all(batch);
+        
+        // Pequeno delay entre lotes para não sobrecarregar
+        if (i + batchSize < promises.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+}
+
+// Update indicator display
+function updateIndicatorDisplay(indicator, result) {
+    if (result.success && result.attachments && result.attachments.length > 0) {
+        // Há anexos - mostrar clipe
+        indicator.innerHTML = '📎';
+        indicator.title = `${result.attachments.length} anexo(s) PDF`;
+        indicator.className = 'attachment-indicator has-attachments';
+        indicator.style.display = 'inline-flex';
+    } else {
+        // Sem anexos - ocultar completamente
+        indicator.innerHTML = '';
+        indicator.title = '';
+        indicator.className = 'attachment-indicator no-attachments';
+        indicator.style.display = 'none';
+    }
+}
+
+// Update attachment indicator for a specific occurrence
+async function updateAttachmentIndicator(numeroGenesis) {
+    try {
+        // Limpar cache para esta ocorrência para forçar atualização
+        attachmentsCache.delete(numeroGenesis);
+        
+        const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
+        
+        // Atualizar cache
+        attachmentsCache.set(numeroGenesis, result);
+        
+        // Encontrar o índice da ocorrência na tabela
+        const occurrenceIndex = filteredOccurrences.findIndex(occ => 
+            occ.ocorrencia?.numeroGenesis === numeroGenesis
+        );
+        
+        if (occurrenceIndex !== -1) {
+            const indicator = document.getElementById(`attachment-${occurrenceIndex}`);
+            
+            if (indicator) {
+                updateIndicatorDisplay(indicator, result);
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar indicador de anexo:', error);
+    }
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (!bytes) return 'Tamanho desconhecido';
+
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Bytes';
+
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// Generate attachments list HTML
+function generateAttachmentsList(attachments) {
+    if (!attachments || attachments.length === 0) {
+        return '<p class="no-attachments">Nenhum anexo PDF encontrado.</p>';
+    }
+
+    return attachments.map(attachment => `
+        <div class="attachment-item">
+            <div class="attachment-info">
+                <svg class="attachment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <div class="attachment-details">
+                    <span class="attachment-name">${attachment.fileName}</span>
+                    <span class="attachment-meta">
+                        ${formatFileSize(attachment.size)} • ${formatDateTime(attachment.dateCreated)}
+                    </span>
+                </div>
+            </div>
+            <div class="attachment-actions">
+                <button class="btn-attachment btn-view" onclick="window.open('${attachment.viewUrl || attachment.fileUrl}', '_blank')" title="Visualizar PDF">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+                <button class="btn-attachment btn-download" onclick="downloadAttachment('${attachment.downloadUrl || attachment.fileUrl}', '${attachment.fileName}')" title="Baixar PDF">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-15"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </button>
+                <button class="btn-attachment btn-remove" onclick="confirmRemoveAttachment('${attachment.fileId}', '${attachment.fileName}')" title="Remover PDF">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/>
+                        <line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Download attachment
+function downloadAttachment(fileUrl, fileName) {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Confirm remove attachment
+function confirmRemoveAttachment(fileId, fileName) {
+    customAlert.confirm(
+        `Deseja realmente remover o anexo "${fileName}"?<br><br>⚠️ Esta ação não pode ser desfeita.`,
+        () => {
+            removeAttachment(fileId, fileName);
+        },
+        null,
+        'Remover Anexo'
+    );
+}
+
+// Remove attachment
+async function removeAttachment(fileId, fileName) {
+    if (!currentOccurrence || !fileId) return;
+
+    showLoading('Removendo anexo', 'Excluindo arquivo do Google Drive...');
+
+    try {
+        const result = await ipcRenderer.invoke('delete-pdf-attachment', {
+            fileId: fileId,
+            fileName: fileName,
+            numeroGenesis: currentOccurrence.ocorrencia.numeroGenesis
+        });
+
+        hideLoading();
+
+        if (result && result.success) {
+            customAlert.success(`Anexo "${fileName}" removido com sucesso!`);
+
+            // Recarregar anexos no modal
+            const attachmentsList = document.getElementById('attachmentsList');
+            if (attachmentsList && currentOccurrence) {
+                loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
+            }
+
+            // Limpar cache e atualizar indicador na tabela
+            attachmentsCache.delete(currentOccurrence.ocorrencia.numeroGenesis);
+            updateAttachmentIndicator(currentOccurrence.ocorrencia.numeroGenesis);
+        } else {
+            customAlert.error('Erro ao remover anexo: ' + (result?.message || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        console.error('Erro ao remover anexo:', error);
+        hideLoading();
+        customAlert.error('Erro ao remover anexo: ' + error.message);
+    }
+}
+
+// Close modal - Otimizado para Performance
 function closeModal() {
-    viewModal.classList.remove('active');
-    currentOccurrence = null;
-    isEditMode = false;
+    // Usar requestAnimationFrame para melhor performance
+    requestAnimationFrame(() => {
+        viewModal.classList.remove('active');
+        currentOccurrence = null;
+        isEditMode = false;
+    });
 }
 
 // Save edit
@@ -503,7 +806,7 @@ async function saveEdit() {
 }
 
 // Open delete modal
-window.confirmDelete = function(index) {
+window.confirmDelete = function (index) {
     currentOccurrence = filteredOccurrences[index];
     deleteOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     deleteModal.classList.add('active');
@@ -533,27 +836,58 @@ async function executeDelete() {
 }
 
 // Open print modal
-window.openPrintModal = function(index) {
+window.openPrintModal = function (index) {
     currentOccurrence = filteredOccurrences[index];
     printOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     printModal.classList.add('active');
 };
 
+// Open attach modal
+window.openAttachModal = function (index) {
+    console.log('Abrindo modal de anexo para índice:', index);
+    currentOccurrence = filteredOccurrences[index];
+    console.log('Ocorrência atual:', currentOccurrence);
+
+    // Limpar estado anterior
+    if (pdfFileInput) pdfFileInput.value = '';
+    if (attachOccurrenceId) attachOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
+    if (selectedFileName) selectedFileName.textContent = 'Nenhum arquivo selecionado';
+    if (btnUploadPDF) btnUploadPDF.disabled = true;
+    
+    // Abrir modal
+    if (attachModal) {
+        attachModal.classList.add('active');
+        console.log('Modal de anexo aberto');
+        
+        // Garantir que o modal permaneça visível
+        setTimeout(() => {
+            if (!attachModal.classList.contains('active')) {
+                console.log('Modal foi fechado inadvertidamente, reabrindo...');
+                attachModal.classList.add('active');
+            }
+        }, 100);
+    } else {
+        console.error('Modal de anexo não encontrado');
+    }
+};
+
 // Close print modal
 function closePrintModal() {
-    printModal.classList.remove('active');
+    requestAnimationFrame(() => {
+        printModal.classList.remove('active');
+    });
 }
 
 // Print Termo de Apreensão
 async function printTermoApreensao() {
     if (!currentOccurrence) return;
-    
+
     printModal.classList.remove('active');
     showLoading('Gerando documento', 'Criando Termo de Apreensão...');
-    
+
     try {
         closePrintModal();
-        
+
         // Gerar e exibir prévia do documento
         const result = await ipcRenderer.invoke('print-termo-apreensao', currentOccurrence);
         hideLoading();
@@ -564,6 +898,136 @@ async function printTermoApreensao() {
         console.error('Erro ao gerar documento:', error);
         hideLoading();
         customAlert.error('Erro ao gerar documento');
+    }
+}
+
+// Close attach modal
+function closeAttachModal() {
+    console.log('Fechando modal de anexo...');
+    requestAnimationFrame(() => {
+        if (attachModal) {
+            attachModal.classList.remove('active');
+        }
+        if (pdfFileInput) {
+            pdfFileInput.value = '';
+        }
+        if (selectedFileName) {
+            selectedFileName.textContent = 'Nenhum arquivo selecionado';
+        }
+        if (btnUploadPDF) {
+            btnUploadPDF.disabled = true;
+        }
+        console.log('Modal de anexo fechado');
+    });
+}
+
+// Select PDF file
+function selectPDFFile() {
+    console.log('Abrindo seletor de arquivo...');
+    if (pdfFileInput) {
+        pdfFileInput.click();
+    } else {
+        console.error('Elemento pdfFileInput não encontrado');
+    }
+}
+
+// Handle PDF file selection
+function handlePDFSelection(event) {
+    console.log('Arquivo selecionado:', event.target.files);
+    
+    // Garantir que o modal permaneça aberto
+    if (attachModal && !attachModal.classList.contains('active')) {
+        console.log('Reabrindo modal de anexo...');
+        attachModal.classList.add('active');
+    }
+    
+    const file = event.target.files[0];
+    if (file) {
+        console.log('Tipo do arquivo:', file.type);
+        console.log('Tamanho do arquivo:', file.size);
+
+        if (file.type !== 'application/pdf') {
+            customAlert.error('Por favor, selecione apenas arquivos PDF.');
+            pdfFileInput.value = '';
+            selectedFileName.textContent = 'Nenhum arquivo selecionado';
+            btnUploadPDF.disabled = true;
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            customAlert.error('O arquivo deve ter no máximo 10MB.');
+            pdfFileInput.value = '';
+            selectedFileName.textContent = 'Nenhum arquivo selecionado';
+            btnUploadPDF.disabled = true;
+            return;
+        }
+
+        selectedFileName.textContent = file.name;
+        btnUploadPDF.disabled = false;
+        console.log('Arquivo válido selecionado:', file.name);
+    } else {
+        console.log('Nenhum arquivo selecionado - usuário cancelou');
+        selectedFileName.textContent = 'Nenhum arquivo selecionado';
+        btnUploadPDF.disabled = true;
+    }
+}
+
+// Upload PDF to Google Drive
+async function uploadPDFAttachment() {
+    console.log('Iniciando upload do PDF...');
+    if (!currentOccurrence || !pdfFileInput.files[0]) {
+        console.log('Erro: Ocorrência ou arquivo não encontrado');
+        return;
+    }
+
+    const file = pdfFileInput.files[0];
+    console.log('Arquivo para upload:', file.name, file.size);
+    showLoading('Enviando PDF', 'Fazendo upload para o Google Drive...');
+
+    try {
+        // Converter arquivo para ArrayBuffer para enviar via IPC
+        const arrayBuffer = await file.arrayBuffer();
+        const fileData = {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            data: Array.from(new Uint8Array(arrayBuffer))
+        };
+
+        console.log('Enviando arquivo via IPC...');
+        const result = await ipcRenderer.invoke('upload-pdf-attachment', {
+            fileData: fileData,
+            occurrence: currentOccurrence,
+            fileName: file.name
+        });
+
+        hideLoading();
+        console.log('Resposta do backend:', result);
+
+        if (result && result.success) {
+            // Fechar modal imediatamente
+            closeAttachModal();
+            
+            // Mostrar mensagem de sucesso
+            customAlert.success('PDF anexado com sucesso!<br><br><strong>Arquivo:</strong> ' + result.fileName);
+
+            // Recarregar anexos no modal se estiver aberto
+            const attachmentsList = document.getElementById('attachmentsList');
+            if (attachmentsList && currentOccurrence) {
+                loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
+            }
+
+            // Limpar cache e atualizar indicador na tabela
+            attachmentsCache.delete(currentOccurrence.ocorrencia.numeroGenesis);
+            updateAttachmentIndicator(currentOccurrence.ocorrencia.numeroGenesis);
+        } else {
+            console.error('Erro no resultado:', result);
+            customAlert.error('Erro ao anexar PDF: ' + (result?.message || 'Erro desconhecido'));
+        }
+    } catch (error) {
+        console.error('Erro ao fazer upload do PDF:', error);
+        hideLoading();
+        customAlert.error('Erro ao anexar PDF: ' + error.message);
     }
 }
 
@@ -585,44 +1049,51 @@ async function exportToExcel() {
     }
 }
 
-// Search
+// Search com debounce para melhor performance
+let searchTimeout;
 searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
-    
-    if (!query) {
-        filteredOccurrences = [...allOccurrences];
-    } else {
-        filteredOccurrences = allOccurrences.filter(occ => {
-            try {
-                // Tentar diferentes possíveis estruturas de dados
-                let numeroGenesis = '';
-                
-                if (occ.ocorrencia?.numeroGenesis) {
-                    numeroGenesis = occ.ocorrencia.numeroGenesis;
+    // Limpar timeout anterior
+    clearTimeout(searchTimeout);
+
+    // Debounce de 300ms para evitar muitas renderizações
+    searchTimeout = setTimeout(() => {
+        const query = e.target.value.toLowerCase().trim();
+
+        if (!query) {
+            filteredOccurrences = [...allOccurrences];
+        } else {
+            filteredOccurrences = allOccurrences.filter(occ => {
+                try {
+                    // Tentar diferentes possíveis estruturas de dados
+                    let numeroGenesis = '';
+
+                    if (occ.ocorrencia?.numeroGenesis) {
+                        numeroGenesis = occ.ocorrencia.numeroGenesis;
+                    }
+                    else if (occ.numeroGenesis) {
+                        numeroGenesis = occ.numeroGenesis;
+                    }
+                    else if (occ['Nº Genesis']) {
+                        numeroGenesis = occ['Nº Genesis'];
+                    }
+                    else if (occ['numeroGenesis']) {
+                        numeroGenesis = occ['numeroGenesis'];
+                    }
+                    else if (occ['numero_genesis']) {
+                        numeroGenesis = occ['numero_genesis'];
+                    }
+
+                    const numeroGenesisLower = (numeroGenesis || '').toString().toLowerCase();
+                    return numeroGenesisLower.includes(query);
+                } catch (error) {
+                    console.error('Erro ao filtrar ocorrência:', error, occ);
+                    return false;
                 }
-                else if (occ.numeroGenesis) {
-                    numeroGenesis = occ.numeroGenesis;
-                }
-                else if (occ['Nº Genesis']) {
-                    numeroGenesis = occ['Nº Genesis'];
-                }
-                else if (occ['numeroGenesis']) {
-                    numeroGenesis = occ['numeroGenesis'];
-                }
-                else if (occ['numero_genesis']) {
-                    numeroGenesis = occ['numero_genesis'];
-                }
-                
-                const numeroGenesisLower = (numeroGenesis || '').toString().toLowerCase();
-                return numeroGenesisLower.includes(query);
-            } catch (error) {
-                console.error('Erro ao filtrar ocorrência:', error, occ);
-                return false;
-            }
-        });
-    }
-    
-    renderTable();
+            });
+        }
+
+        renderTable();
+    }, 300);
 });
 
 // Tab navigation
@@ -641,11 +1112,11 @@ tabNovaOcorrencia.addEventListener('click', () => {
 function setActiveTab(tab) {
     // Remove active from all tabs
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    
+
     // Hide all sections
     sectionDashboard.style.display = 'none';
     sectionOcorrencias.style.display = 'none';
-    
+
     if (tab === 'dashboard') {
         tabDashboard.classList.add('active');
         sectionDashboard.style.display = 'block';
@@ -662,8 +1133,14 @@ userMenuBtn.addEventListener('click', (e) => {
 });
 
 document.addEventListener('click', (e) => {
+    // Fechar dropdown do usuário se clicar fora
     if (!userDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
         userDropdown.classList.remove('active');
+    }
+    
+    // Não interferir com modais ou file inputs
+    if (e.target.type === 'file' || e.target.closest('.modal') || e.target.closest('.upload-zone')) {
+        return;
     }
 });
 
@@ -692,6 +1169,44 @@ btnCancelDelete.addEventListener('click', () => {
 });
 btnConfirmDelete.addEventListener('click', executeDelete);
 
+// Attach modal events
+if (attachModalClose) attachModalClose.addEventListener('click', closeAttachModal);
+if (btnCancelAttach) btnCancelAttach.addEventListener('click', closeAttachModal);
+// Event listener para seleção de arquivo PDF
+if (pdfFileInput) {
+    pdfFileInput.addEventListener('change', handlePDFSelection);
+    
+    // Prevenir que o modal feche quando o file dialog for cancelado
+    pdfFileInput.addEventListener('cancel', (e) => {
+        console.log('Seleção de arquivo cancelada');
+        e.preventDefault();
+        e.stopPropagation();
+    });
+}
+
+if (btnUploadPDF) btnUploadPDF.addEventListener('click', uploadPDFAttachment);
+
+// Adicionar event listener na zona de upload
+const uploadZone = document.querySelector('.upload-zone');
+if (uploadZone) {
+    uploadZone.addEventListener('click', function () {
+        console.log('Zona de upload clicada');
+        if (pdfFileInput) {
+            pdfFileInput.click();
+        }
+    });
+}
+
+// Debug: verificar se os elementos existem
+console.log('Elementos do modal de anexo:');
+console.log('attachModal:', !!attachModal);
+console.log('attachModalClose:', !!attachModalClose);
+console.log('btnCancelAttach:', !!btnCancelAttach);
+console.log('uploadZone:', !!uploadZone);
+console.log('pdfFileInput:', !!pdfFileInput);
+console.log('btnUploadPDF:', !!btnUploadPDF);
+console.log('selectedFileName:', !!selectedFileName);
+
 printModalClose.addEventListener('click', closePrintModal);
 btnCancelPrint.addEventListener('click', closePrintModal);
 btnPrintTermoApreensao.addEventListener('click', printTermoApreensao);
@@ -700,7 +1215,7 @@ btnPrintTermoApreensao.addEventListener('click', printTermoApreensao);
 refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
     refreshBtn.disabled = true;
-    
+
     try {
         await loadOccurrences();
         // Pequeno delay para mostrar a animação
@@ -739,6 +1254,13 @@ deleteModal.addEventListener('click', (e) => {
 printModal.addEventListener('click', (e) => {
     if (e.target === printModal) {
         closePrintModal();
+    }
+});
+
+// Close attach modal on outside click (but not when file dialog is open)
+attachModal.addEventListener('click', (e) => {
+    if (e.target === attachModal) {
+        closeAttachModal();
     }
 });
 
@@ -782,12 +1304,12 @@ function updateCharts() {
     createLineChart();
     createPieChartMonth();
     createBarChartDay();
-    
+
     // Unidade
     createPieChartUnidadePeriodo();
     createPieChartUnidadeMes();
     createBarChartUnidadeDia();
-    
+
     // Itens
     createPieChartItensPeriodo();
     createPieChartItensMes();
@@ -798,12 +1320,12 @@ function updateCharts() {
 function createLineChart() {
     const ctx = document.getElementById('lineChart');
     if (!ctx) return;
-    
+
     // Destroy existing chart
     if (lineChart) {
         lineChart.destroy();
     }
-    
+
     // Determine date range
     let startDate, endDate;
     if (customDateRange) {
@@ -815,31 +1337,31 @@ function createLineChart() {
         startDate = new Date();
         startDate.setDate(startDate.getDate() - 29);
     }
-    
+
     const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
     const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    
+
     let labels = [];
     let counts = [];
-    
+
     // Se período maior que 60 dias, agrupar por mês
     if (daysDiff > 60) {
         const monthCounts = {};
-        
+
         // Filtrar ocorrências no período
         const filteredOccs = allOccurrences.filter(occ => {
             if (!occ.metadata?.dataRegistro) return false;
             const occDate = new Date(occ.metadata.dataRegistro);
             return occDate >= startDate && occDate <= endDate;
         });
-        
+
         // Contar por mês
         filteredOccs.forEach(occ => {
             const occDate = new Date(occ.metadata.dataRegistro);
             const monthKey = `${monthNames[occDate.getMonth()]}/${occDate.getFullYear()}`;
             monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
         });
-        
+
         // Ordenar por data
         const sortedMonths = Object.entries(monthCounts).sort((a, b) => {
             const [monthA, yearA] = a[0].split('/');
@@ -848,7 +1370,7 @@ function createLineChart() {
             const dateB = new Date(yearB, monthNames.indexOf(monthB));
             return dateA - dateB;
         });
-        
+
         labels = sortedMonths.map(([month]) => month);
         counts = sortedMonths.map(([, count]) => count);
     } else {
@@ -858,7 +1380,7 @@ function createLineChart() {
             date.setDate(date.getDate() + i);
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
             labels.push(dateStr);
-            
+
             const count = allOccurrences.filter(occ => {
                 if (!occ.metadata?.dataRegistro) return false;
                 const occDate = new Date(occ.metadata.dataRegistro);
@@ -867,9 +1389,9 @@ function createLineChart() {
             counts.push(count);
         }
     }
-    
+
     const colors = ['#279b4d', '#071d49', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-    
+
     lineChart = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -904,10 +1426,10 @@ function createLineChart() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -925,23 +1447,23 @@ function createLineChart() {
 function createBarChartDay() {
     const ctx = document.getElementById('barChartDay');
     if (!ctx) return;
-    
+
     // Destroy existing chart
     if (barChartDay) {
         barChartDay.destroy();
     }
-    
+
     // Get last 7 days data
     const last7Days = [];
     const counts = [];
     const now = new Date();
-    
+
     for (let i = 6; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
         const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         last7Days.push(dateStr);
-        
+
         const count = allOccurrences.filter(occ => {
             if (!occ.metadata?.dataRegistro) return false;
             const occDate = new Date(occ.metadata.dataRegistro);
@@ -949,15 +1471,15 @@ function createBarChartDay() {
         }).length;
         counts.push(count);
     }
-    
+
     const total = counts.reduce((a, b) => a + b, 0);
-    
+
     // Update total display
     const totalElement = document.getElementById('totalDayOccurrences');
     if (totalElement) {
         totalElement.textContent = total;
     }
-    
+
     barChartDay = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1016,12 +1538,12 @@ function createBarChartDay() {
 function createPieChartUnidadePeriodo() {
     const ctx = document.getElementById('pieChartUnidadePeriodo');
     if (!ctx) return;
-    
+
     // Destroy existing chart
     if (pieChartUnidadePeriodo) {
         pieChartUnidadePeriodo.destroy();
     }
-    
+
     // Determine date range
     let startDate, endDate;
     if (customDateRangeUnidade) {
@@ -1033,37 +1555,37 @@ function createPieChartUnidadePeriodo() {
         startDate = new Date();
         startDate.setDate(startDate.getDate() - 29);
     }
-    
+
     // Filtrar ocorrências no período
     const filteredOccs = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate >= startDate && occDate <= endDate;
     });
-    
+
     // Contar por unidade
     const unitCounts = {};
     filteredOccs.forEach(occ => {
         const unit = occ.ocorrencia?.unidade || 'Não especificado';
         unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
-    
+
     // Ordenar por quantidade
     const sortedUnits = Object.entries(unitCounts)
         .sort((a, b) => b[1] - a[1]);
-    
+
     const labels = sortedUnits.map(([unit]) => unit);
     const counts = sortedUnits.map(([, count]) => count);
     const total = counts.reduce((a, b) => a + b, 0);
-    
+
     // Update total display
     const totalElement = document.getElementById('totalUnidadePeriodo');
     if (totalElement) {
         totalElement.textContent = total;
     }
-    
+
     const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-    
+
     pieChartUnidadePeriodo = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -1098,10 +1620,10 @@ function createPieChartUnidadePeriodo() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -1119,12 +1641,12 @@ function createPieChartUnidadePeriodo() {
 function createPieChartItensPeriodo() {
     const ctx = document.getElementById('pieChartItensPeriodo');
     if (!ctx) return;
-    
+
     // Destroy existing chart
     if (pieChartItensPeriodo) {
         pieChartItensPeriodo.destroy();
     }
-    
+
     // Determine date range
     let startDate, endDate;
     if (customDateRangeItens) {
@@ -1136,37 +1658,37 @@ function createPieChartItensPeriodo() {
         startDate = new Date();
         startDate.setDate(startDate.getDate() - 29);
     }
-    
+
     // Filtrar ocorrências no período
     const filteredOccs = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate >= startDate && occDate <= endDate;
     });
-    
+
     // Contar por tipo de item
     const itemCounts = {};
     filteredOccs.forEach(occ => {
         const item = occ.itemApreendido?.item || 'Não especificado';
         itemCounts[item] = (itemCounts[item] || 0) + 1;
     });
-    
+
     // Ordenar por quantidade
     const sortedItems = Object.entries(itemCounts)
         .sort((a, b) => b[1] - a[1]);
-    
+
     const labels = sortedItems.map(([item]) => item);
     const counts = sortedItems.map(([, count]) => count);
     const total = counts.reduce((a, b) => a + b, 0);
-    
+
     // Update total display
     const totalElement = document.getElementById('totalItensPeriodo');
     if (totalElement) {
         totalElement.textContent = total;
     }
-    
+
     const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-    
+
     pieChartItensPeriodo = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -1201,10 +1723,10 @@ function createPieChartItensPeriodo() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -1222,27 +1744,27 @@ function createPieChartItensPeriodo() {
 function createPieChartUnidadeMes() {
     const ctx = document.getElementById('pieChartUnidadeMes');
     if (!ctx) return;
-    
+
     if (pieChartUnidadeMes) {
         pieChartUnidadeMes.destroy();
     }
-    
+
     const unitCounts = {};
     allOccurrences.forEach(occ => {
         const unit = occ.ocorrencia?.unidade || 'Não especificado';
         unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
-    
+
     const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
     const labels = sortedUnits.map(([unit]) => unit);
     const data = sortedUnits.map(([, count]) => count);
     const total = data.reduce((a, b) => a + b, 0);
-    
+
     const totalElement = document.getElementById('totalUnidadeMes');
     if (totalElement) totalElement.textContent = total;
-    
+
     const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-    
+
     pieChartUnidadeMes = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -1275,10 +1797,10 @@ function createPieChartUnidadeMes() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -1296,39 +1818,39 @@ function createPieChartUnidadeMes() {
 function createBarChartUnidadeDia() {
     const ctx = document.getElementById('barChartUnidadeDia');
     if (!ctx) return;
-    
+
     if (barChartUnidadeDia) {
         barChartUnidadeDia.destroy();
     }
-    
+
     // Filtrar ocorrências dos últimos 7 dias
     const now = new Date();
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    
+
     const last7DaysOccs = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate >= sevenDaysAgo && occDate <= now;
     });
-    
+
     // Agrupar por unidade
     const unitCounts = {};
     last7DaysOccs.forEach(occ => {
         const unit = occ.ocorrencia?.unidade || 'Não especificado';
         unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
-    
+
     const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
     const labels = sortedUnits.map(([unit]) => unit);
     const counts = sortedUnits.map(([, count]) => count);
     const total = counts.reduce((a, b) => a + b, 0);
-    
+
     const totalElement = document.getElementById('totalUnidadeDia');
     if (totalElement) totalElement.textContent = total;
-    
+
     const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-    
+
     barChartUnidadeDia = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1356,27 +1878,27 @@ function createBarChartUnidadeDia() {
 function createPieChartItensMes() {
     const ctx = document.getElementById('pieChartItensMes');
     if (!ctx) return;
-    
+
     if (pieChartItensMes) {
         pieChartItensMes.destroy();
     }
-    
+
     const itemCounts = {};
     allOccurrences.forEach(occ => {
         const item = occ.itemApreendido?.item || 'Não especificado';
         itemCounts[item] = (itemCounts[item] || 0) + 1;
     });
-    
+
     const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
     const labels = sortedItems.map(([item]) => item);
     const data = sortedItems.map(([, count]) => count);
     const total = data.reduce((a, b) => a + b, 0);
-    
+
     const totalElement = document.getElementById('totalItensMes');
     if (totalElement) totalElement.textContent = total;
-    
+
     const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#1976d2', '#f57c00', '#7b1fa2', '#00897b', '#00bcd4', '#ff9800'];
-    
+
     pieChartItensMes = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -1409,10 +1931,10 @@ function createPieChartItensMes() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -1430,39 +1952,39 @@ function createPieChartItensMes() {
 function createBarChartItensDia() {
     const ctx = document.getElementById('barChartItensDia');
     if (!ctx) return;
-    
+
     if (barChartItensDia) {
         barChartItensDia.destroy();
     }
-    
+
     // Filtrar ocorrências dos últimos 7 dias
     const now = new Date();
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    
+
     const last7DaysOccs = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
         return occDate >= sevenDaysAgo && occDate <= now;
     });
-    
+
     // Agrupar por tipo de item
     const itemCounts = {};
     last7DaysOccs.forEach(occ => {
         const item = occ.itemApreendido?.item || 'Não especificado';
         itemCounts[item] = (itemCounts[item] || 0) + 1;
     });
-    
+
     const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
     const labels = sortedItems.map(([item]) => item);
     const counts = sortedItems.map(([, count]) => count);
     const total = counts.reduce((a, b) => a + b, 0);
-    
+
     const totalElement = document.getElementById('totalItensDia');
     if (totalElement) totalElement.textContent = total;
-    
+
     const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-    
+
     barChartItensDia = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1490,24 +2012,24 @@ function createBarChartItensDia() {
 function createPieChartMonth() {
     const ctx = document.getElementById('pieChartMonth');
     if (!ctx) return;
-    
+
     // Destroy existing chart
     if (pieChartMonth) {
         pieChartMonth.destroy();
     }
-    
+
     // Count by month
     const monthCounts = {};
     const monthNames = [
         'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
-    
+
     // Initialize all months with 0
     monthNames.forEach(month => {
         monthCounts[month] = 0;
     });
-    
+
     // Count occurrences by month
     allOccurrences.forEach(occ => {
         if (occ.metadata?.dataRegistro) {
@@ -1516,29 +2038,29 @@ function createPieChartMonth() {
             monthCounts[monthName]++;
         }
     });
-    
+
     // Filter out months with 0 occurrences and sort by month order
     const sortedData = monthNames
         .map(month => ({ month, count: monthCounts[month] }))
         .filter(item => item.count > 0);
-    
+
     const labels = sortedData.map(item => item.month);
     const data = sortedData.map(item => item.count);
     const total = data.reduce((a, b) => a + b, 0);
-    
+
     // Update total display
     const totalElement = document.getElementById('totalMonthOccurrences');
     if (totalElement) {
         totalElement.textContent = total;
     }
-    
+
     // Colors for each month
     const colors = [
         '#279b4d', '#071d49', '#fac709', '#c33',
         '#00bcd4', '#ff9800', '#9c27b0', '#4caf50',
         '#f44336', '#2196f3', '#ff5722', '#795548'
     ];
-    
+
     pieChartMonth = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -1571,10 +2093,10 @@ function createPieChartMonth() {
                     borderWidth: 2,
                     displayColors: false,
                     callbacks: {
-                        title: function() {
+                        title: function () {
                             return '';
                         },
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -1594,20 +2116,20 @@ function createPieChartMonth() {
 function isValidDateFilter(dateString) {
     const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
     const match = dateString.match(regex);
-    
+
     if (!match) return false;
-    
+
     const day = parseInt(match[1], 10);
     const month = parseInt(match[2], 10);
     const year = parseInt(match[3], 10);
-    
+
     if (month < 1 || month > 12) return false;
     if (day < 1 || day > 31) return false;
-    
+
     const date = new Date(year, month - 1, day);
-    return date.getFullYear() === year && 
-           date.getMonth() === month - 1 && 
-           date.getDate() === day;
+    return date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day;
 }
 
 // Função para converter data brasileira para objeto Date
@@ -1619,14 +2141,14 @@ function brDateToDateObj(brDate) {
 // Aplicar máscara de data nos campos de filtro
 function applyDateMaskFilter(e) {
     let value = e.target.value.replace(/\D/g, '');
-    
+
     if (value.length >= 2) {
         value = value.substring(0, 2) + '/' + value.substring(2);
     }
     if (value.length >= 5) {
         value = value.substring(0, 5) + '/' + value.substring(5, 9);
     }
-    
+
     e.target.value = value;
 }
 
@@ -1644,30 +2166,30 @@ if (btnFilterChart) {
     btnFilterChart.addEventListener('click', () => {
         const dataInicio = filterDataInicio.value;
         const dataFim = filterDataFim.value;
-        
+
         if (!dataInicio || !dataFim) {
             customAlert.error('Por favor, preencha ambas as datas');
             return;
         }
-        
+
         if (!isValidDateFilter(dataInicio)) {
             customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         if (!isValidDateFilter(dataFim)) {
             customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         const startDate = brDateToDateObj(dataInicio);
         const endDate = brDateToDateObj(dataFim);
-        
+
         if (startDate > endDate) {
             customAlert.error('A data de início deve ser anterior à data de fim');
             return;
         }
-        
+
         customDateRange = { startDate, endDate };
         createLineChart();
     });
@@ -1699,30 +2221,30 @@ if (btnFilterChartUnidade) {
     btnFilterChartUnidade.addEventListener('click', () => {
         const dataInicio = filterDataInicioUnidade.value;
         const dataFim = filterDataFimUnidade.value;
-        
+
         if (!dataInicio || !dataFim) {
             customAlert.error('Por favor, preencha ambas as datas');
             return;
         }
-        
+
         if (!isValidDateFilter(dataInicio)) {
             customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         if (!isValidDateFilter(dataFim)) {
             customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         const startDate = brDateToDateObj(dataInicio);
         const endDate = brDateToDateObj(dataFim);
-        
+
         if (startDate > endDate) {
             customAlert.error('A data de início deve ser anterior à data de fim');
             return;
         }
-        
+
         customDateRangeUnidade = { startDate, endDate };
         createPieChartUnidade();
     });
@@ -1754,30 +2276,30 @@ if (btnFilterChartItens) {
     btnFilterChartItens.addEventListener('click', () => {
         const dataInicio = filterDataInicioItens.value;
         const dataFim = filterDataFimItens.value;
-        
+
         if (!dataInicio || !dataFim) {
             customAlert.error('Por favor, preencha ambas as datas');
             return;
         }
-        
+
         if (!isValidDateFilter(dataInicio)) {
             customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         if (!isValidDateFilter(dataFim)) {
             customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
             return;
         }
-        
+
         const startDate = brDateToDateObj(dataInicio);
         const endDate = brDateToDateObj(dataFim);
-        
+
         if (startDate > endDate) {
             customAlert.error('A data de início deve ser anterior à data de fim');
             return;
         }
-        
+
         customDateRangeItens = { startDate, endDate };
         createPieChartItens();
     });

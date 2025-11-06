@@ -60,7 +60,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'views/login.html'));
-  
+
   // Remove o menu completamente
   mainWindow.setMenu(null);
 
@@ -74,9 +74,261 @@ function createWindow() {
   });
 }
 
+// Função para registrar handlers IPC
+function registerIPCHandlers() {
+  console.log('Registrando handlers IPC...');
+
+  // IPC Handler para upload de PDF para Google Drive
+  ipcMain.handle('upload-pdf-attachment', async (event, data) => {
+    try {
+      console.log('=== INICIANDO UPLOAD DE PDF ===');
+      console.log('Dados recebidos:', {
+        fileName: data.fileName,
+        fileSize: data.fileData?.size,
+        occurrence: data.occurrence?.ocorrencia?.numeroGenesis
+      });
+
+      const { fileData, occurrence, fileName } = data;
+
+      // Validações
+      if (!fileData || !occurrence || !fileName) {
+        throw new Error('Dados incompletos para upload');
+      }
+
+      // Converter array de bytes para base64
+      const buffer = Buffer.from(fileData.data);
+      const base64Content = buffer.toString('base64');
+
+      // URL do Google Apps Script configurada
+      const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypVoHlRweEPEH01JH53DGKCYrOhhDQ2VpxnfCOHNjMIj8_0DLQnQBZsZO-JaQhkXXZuQ/exec";
+
+      if (GOOGLE_APPS_SCRIPT_URL.includes('SEU_SCRIPT_ID_AQUI')) {
+        console.log('⚠️  URL do Google Apps Script não configurada. Usando modo de teste.');
+
+        // Simular upload bem-sucedido para teste
+        const mockResult = {
+          success: true,
+          fileId: 'mock-file-id-' + Date.now(),
+          fileName: fileName,
+          fileUrl: 'https://drive.google.com/file/d/mock-file-id/view',
+          downloadUrl: 'https://drive.google.com/uc?id=mock-file-id',
+          viewUrl: 'https://drive.google.com/file/d/mock-file-id/view',
+          size: fileData.size,
+          dateCreated: new Date().toISOString(),
+          message: 'PDF anexado com sucesso (MODO TESTE)'
+        };
+
+        console.log('Resultado simulado:', mockResult);
+        return mockResult;
+      }
+
+      // Dados para enviar ao Google Apps Script
+      const uploadData = {
+        action: 'upload',
+        numeroGenesis: occurrence.ocorrencia.numeroGenesis,
+        unidade: occurrence.ocorrencia.unidade || 'Não informado',
+        fileName: fileName,
+        fileContent: base64Content
+      };
+
+      console.log('Enviando para Google Apps Script:', {
+        action: uploadData.action,
+        numeroGenesis: uploadData.numeroGenesis,
+        unidade: uploadData.unidade,
+        fileName: uploadData.fileName,
+        contentSize: base64Content.length
+      });
+
+      // Fazer requisição para o Google Apps Script
+      const fetch = require('node-fetch');
+      const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(uploadData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro HTTP no upload:', response.status);
+        console.error('📄 URL utilizada:', GOOGLE_APPS_SCRIPT_URL);
+        console.error('🔍 Resposta do servidor:', errorText.substring(0, 500));
+
+        if (response.status === 401) {
+          throw new Error('Erro 401: Verifique se o Google Apps Script foi implantado corretamente e se as permissões estão configuradas.');
+        } else if (response.status === 404) {
+          throw new Error('Erro 404: URL do Google Apps Script não encontrada. Verifique se a URL está correta.');
+        } else {
+          throw new Error(`Erro HTTP ${response.status}: Falha na comunicação com o Google Apps Script`);
+        }
+      }
+
+      const result = await response.json();
+      console.log('Resposta do Google Apps Script:', result);
+
+      if (result.success) {
+        return {
+          success: true,
+          fileUrl: result.viewUrl || result.fileUrl,
+          downloadUrl: result.downloadUrl,
+          fileId: result.fileId,
+          fileName: result.fileName,
+          message: result.message || 'PDF anexado com sucesso!'
+        };
+      } else {
+        throw new Error(result.message || 'Erro desconhecido no upload');
+      }
+
+    } catch (error) {
+      console.error('Erro no upload do PDF:', error);
+      return {
+        success: false,
+        message: 'Erro ao fazer upload do PDF: ' + error.message
+      };
+    }
+  });
+
+  // IPC Handler para listar anexos de uma ocorrência
+  ipcMain.handle('list-pdf-attachments', async (event, numeroGenesis) => {
+    try {
+      console.log('=== LISTANDO ANEXOS PDF ===');
+      console.log('Número Genesis:', numeroGenesis);
+
+      // URL do Google Apps Script configurada (Versão 4)
+      const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypVoHlRweEPEH01JH53DGKCYrOhhDQ2VpxnfCOHNjMIj8_0DLQnQBZsZO-JaQhkXXZuQ/exec";
+
+      if (GOOGLE_APPS_SCRIPT_URL.includes('SEU_SCRIPT_ID_AQUI')) {
+        console.log('⚠️  URL do Google Apps Script não configurada. Retornando lista vazia.');
+
+        return {
+          success: true,
+          attachments: [],
+          message: 'Modo de teste - configure o Google Apps Script para ver anexos reais'
+        };
+      }
+
+      // Fazer requisição GET para listar arquivos
+      const fetch = require('node-fetch');
+      const url = `${GOOGLE_APPS_SCRIPT_URL}?numeroGenesis=${encodeURIComponent(numeroGenesis)}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro HTTP ao listar:', response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Anexos encontrados:', result);
+
+      if (result.success) {
+        return {
+          success: true,
+          attachments: result.files || [],
+          message: result.message
+        };
+      } else {
+        return {
+          success: true,
+          attachments: [],
+          message: 'Nenhum anexo encontrado'
+        };
+      }
+
+    } catch (error) {
+      console.error('Erro ao listar anexos:', error);
+      return {
+        success: false,
+        attachments: [],
+        message: 'Erro ao listar anexos: ' + error.message
+      };
+    }
+  });
+
+  // Handlers IPC configurados
+
+  // IPC Handler para deletar anexo PDF
+  ipcMain.handle('delete-pdf-attachment', async (event, data) => {
+    try {
+      console.log('=== DELETANDO ANEXO PDF ===');
+      console.log('Dados recebidos:', {
+        fileId: data.fileId,
+        fileName: data.fileName,
+        numeroGenesis: data.numeroGenesis
+      });
+
+      const { fileId, fileName } = data;
+      
+      // Validações
+      if (!fileId || !fileName) {
+        throw new Error('Dados incompletos para exclusão');
+      }
+
+      // URL do Google Apps Script configurada (Versão 4)
+      const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypVoHlRweEPEH01JH53DGKCYrOhhDQ2VpxnfCOHNjMIj8_0DLQnQBZsZO-JaQhkXXZuQ/exec";
+
+      // Dados para enviar ao Google Apps Script
+      const deleteData = {
+        action: 'delete',
+        fileId: fileId
+      };
+
+      console.log('Enviando para Google Apps Script:', deleteData);
+
+      // Fazer requisição para o Google Apps Script
+      const fetch = require('node-fetch');
+      const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(deleteData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro HTTP na exclusão:', response.status);
+        console.error('🔍 Resposta do servidor:', errorText.substring(0, 500));
+        throw new Error(`Erro HTTP ${response.status}: Falha na comunicação com o Google Apps Script`);
+      }
+
+      const result = await response.json();
+      console.log('Resposta do Google Apps Script:', result);
+
+      if (result.success) {
+        return {
+          success: true,
+          message: result.message || 'Anexo removido com sucesso!'
+        };
+      } else {
+        throw new Error(result.message || 'Erro desconhecido na exclusão');
+      }
+
+    } catch (error) {
+      console.error('Erro na exclusão do anexo:', error);
+      return {
+        success: false,
+        message: 'Erro ao remover anexo: ' + error.message
+      };
+    }
+  });
+
+  console.log('Handlers IPC registrados com sucesso!');
+}
+
 app.whenReady().then(() => {
   ensureFolders();
   createWindow();
+
+  // Registrar handlers IPC após o app estar pronto
+  registerIPCHandlers();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -92,10 +344,10 @@ ipcMain.handle('authenticate', async (event, username, password) => {
   return new Promise((resolve, reject) => {
     // Verificar se está em produção (executável) ou desenvolvimento
     const isDev = !app.isPackaged;
-    
+
     let authCommand;
     let authArgs;
-    
+
     if (isDev) {
       // Desenvolvimento: usar Python script diretamente
       const pythonScript = path.join(__dirname, '../auth/auth_wrapper.py');
@@ -105,13 +357,13 @@ ipcMain.handle('authenticate', async (event, username, password) => {
       // Produção: usar executável compilado
       authCommand = path.join(process.resourcesPath, 'auth/auth_keyauth.exe');
       authArgs = [username, password];
-      
+
       // Verificar se o executável existe
       const fs = require('fs');
       if (!fs.existsSync(authCommand)) {
         // Tentar caminho alternativo
         const alternativePath = path.join(__dirname, '../auth/auth_keyauth.exe');
-        
+
         if (fs.existsSync(alternativePath)) {
           authCommand = alternativePath;
         } else {
@@ -125,7 +377,7 @@ ipcMain.handle('authenticate', async (event, username, password) => {
         }
       }
     }
-    
+
     const authProcess = spawn(authCommand, authArgs);
 
     let dataString = '';
@@ -140,13 +392,13 @@ ipcMain.handle('authenticate', async (event, username, password) => {
     });
 
     authProcess.on('close', (code) => {
-      
+
       if (code === 0 && dataString.trim()) {
         try {
           // Extract JSON from output (KeyAuth library prints messages before JSON)
           const lines = dataString.trim().split('\n');
           let jsonString = '';
-          
+
           // Find the line that starts with { (JSON object)
           for (const line of lines) {
             const trimmedLine = line.trim();
@@ -155,15 +407,15 @@ ipcMain.handle('authenticate', async (event, username, password) => {
               break;
             }
           }
-          
+
           if (!jsonString) {
             throw new Error('No JSON found in output');
           }
-          
+
           const result = JSON.parse(jsonString);
           resolve(result);
         } catch (e) {
-          resolve({ 
+          resolve({
             success: false,
             errorCode: 92,
             errorType: 'PARSE_ERROR',
@@ -176,7 +428,7 @@ ipcMain.handle('authenticate', async (event, username, password) => {
           const outputToCheck = dataString.trim() || errorString.trim();
           const lines = outputToCheck.split('\n');
           let jsonString = '';
-          
+
           for (const line of lines) {
             const trimmedLine = line.trim();
             if (trimmedLine.startsWith('{')) {
@@ -184,7 +436,7 @@ ipcMain.handle('authenticate', async (event, username, password) => {
               break;
             }
           }
-          
+
           if (jsonString) {
             const errorResult = JSON.parse(jsonString);
             resolve(errorResult);
@@ -193,9 +445,9 @@ ipcMain.handle('authenticate', async (event, username, password) => {
         } catch (e) {
           // Silencioso em produção
         }
-        
+
         // Se não conseguiu extrair JSON, retornar erro genérico
-        resolve({ 
+        resolve({
           success: false,
           errorCode: 95,
           errorType: 'AUTH_ERROR',
@@ -206,8 +458,8 @@ ipcMain.handle('authenticate', async (event, username, password) => {
 
     authProcess.on('error', (error) => {
       console.error('Auth spawn error:', error);
-      resolve({ 
-        success: false, 
+      resolve({
+        success: false,
         message: 'Erro ao executar autenticação: ' + error.message
       });
     });
@@ -230,26 +482,26 @@ function isoToBrDate(isoDate) {
 ipcMain.handle('save-occurrence', async (event, data) => {
   try {
     console.log('Dados da ocorrência:', JSON.stringify(data, null, 2));
-    
+
     // Formato: [NumeroGenesis][dd.mm.yyyy]
     const dateStr = formatDateForFilename();
     const numeroGenesis = data.ocorrencia.numeroGenesis;
-    
+
     // Salvar JSON (backup) em C:\SECRIMPO\Ocorrencias
     const jsonFilename = `[${numeroGenesis}][${dateStr}].json`;
     const jsonFilepath = path.join(FOLDERS.ocorrencias, jsonFilename);
     fs.writeFileSync(jsonFilepath, JSON.stringify(data, null, 2));
-    
+
     console.log('✓ JSON salvo em:', jsonFilepath);
-    
+
     // Enviar para Google Sheets (se configurado)
     const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec"; // Cole sua URL do Google Apps Script aqui
-    
+
     if (GOOGLE_SHEETS_URL) {
       try {
         const https = require('https');
         const url = require('url');
-        
+
         // Preparar dados para envio (formato array para Google Apps Script)
         // Envia apenas a linha de dados (sem cabeçalhos, pois já existem na planilha)
         const sheetData = {
@@ -276,10 +528,10 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             data.metadata.registradoPor
           ]
         };
-        
+
         const postData = JSON.stringify(sheetData);
         const parsedUrl = url.parse(GOOGLE_SHEETS_URL);
-        
+
         const options = {
           hostname: parsedUrl.hostname,
           path: parsedUrl.path,
@@ -289,14 +541,14 @@ ipcMain.handle('save-occurrence', async (event, data) => {
             'Content-Length': Buffer.byteLength(postData)
           }
         };
-        
+
         await new Promise((resolve, reject) => {
           const req = https.request(options, (res) => {
             // Seguir redirecionamentos (302, 301, 307)
             if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307) {
               const redirectUrl = res.headers.location;
               console.log('Seguindo redirecionamento para Google Sheets...');
-              
+
               https.get(redirectUrl, (redirectRes) => {
                 let responseData = '';
                 redirectRes.on('data', (chunk) => { responseData += chunk; });
@@ -308,10 +560,10 @@ ipcMain.handle('save-occurrence', async (event, data) => {
                 console.error('Erro no redirect para Google Sheets:', error);
                 reject(error);
               });
-              
+
               return;
             }
-            
+
             let responseData = '';
             res.on('data', (chunk) => { responseData += chunk; });
             res.on('end', () => {
@@ -319,33 +571,33 @@ ipcMain.handle('save-occurrence', async (event, data) => {
               resolve();
             });
           });
-          
+
           req.on('error', (error) => {
             console.error('Erro ao enviar para Google Sheets:', error);
             reject(error);
           });
-          
+
           req.write(postData);
           req.end();
         });
-        
+
         console.log('✓ Dados e Excel enviados para planilha online');
       } catch (sheetError) {
         console.error('Erro ao enviar para planilha:', sheetError);
         // Continua mesmo se falhar o envio para planilha
       }
     }
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: 'Ocorrência registrada com sucesso!',
       jsonPath: jsonFilepath
     };
   } catch (error) {
     console.error('Erro ao salvar ocorrência:', error);
-    return { 
-      success: false, 
-      message: 'Erro ao salvar ocorrência: ' + error.message 
+    return {
+      success: false,
+      message: 'Erro ao salvar ocorrência: ' + error.message
     };
   }
 });
@@ -364,15 +616,15 @@ ipcMain.on('load-dashboard', () => {
 ipcMain.handle('get-occurrences', async (event) => {
   try {
     const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
-    
+
     if (!GOOGLE_SHEETS_URL) {
       console.log('Google Sheets URL não configurada, retornando dados locais');
       return { success: true, data: [] };
     }
-    
+
     const https = require('https');
     const url = require('url');
-    
+
     // Função recursiva para seguir redirecionamentos
     const followRedirects = (targetUrl, maxRedirects = 5) => {
       return new Promise((resolve, reject) => {
@@ -380,7 +632,7 @@ ipcMain.handle('get-occurrences', async (event) => {
           reject(new Error('Muitos redirecionamentos'));
           return;
         }
-        
+
         https.get(targetUrl, (res) => {
           // Seguir redirecionamentos
           if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
@@ -389,7 +641,7 @@ ipcMain.handle('get-occurrences', async (event) => {
             followRedirects(redirectUrl, maxRedirects - 1).then(resolve).catch(reject);
             return;
           }
-          
+
           let responseData = '';
           res.on('data', (chunk) => { responseData += chunk; });
           res.on('end', () => {
@@ -400,7 +652,7 @@ ipcMain.handle('get-occurrences', async (event) => {
         });
       });
     };
-    
+
     return new Promise((resolve, reject) => {
       followRedirects(GOOGLE_SHEETS_URL)
         .then(responseData => {
@@ -430,17 +682,17 @@ ipcMain.handle('get-occurrences', async (event) => {
 ipcMain.handle('update-occurrence', async (event, data) => {
   try {
     const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
-    
+
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
     }
-    
+
     const https = require('https');
     const url = require('url');
-    
+
     // Usar numeroGenesisOriginal para identificar a linha, se fornecido
     const numeroGenesisParaBusca = data.numeroGenesisOriginal || data.ocorrencia.numeroGenesis;
-    
+
     const updateData = {
       action: 'update',
       timestamp: new Date().toLocaleString('pt-BR'),
@@ -465,13 +717,13 @@ ipcMain.handle('update-occurrence', async (event, data) => {
       unidadePolicial: data.policial.unidade,
       registradoPor: data.metadata.registradoPor
     };
-    
+
     console.log('Enviando atualização para Google Sheets:', updateData);
     console.log('Número Genesis para busca:', numeroGenesisParaBusca);
     console.log('Número Genesis novo:', data.ocorrencia.numeroGenesis);
-    
+
     const postData = JSON.stringify(updateData);
-    
+
     // Função recursiva para seguir redirecionamentos em POST
     const postWithRedirects = (targetUrl, payload, maxRedirects = 5) => {
       return new Promise((resolve, reject) => {
@@ -479,7 +731,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
           reject(new Error('Muitos redirecionamentos'));
           return;
         }
-        
+
         const parsedUrl = url.parse(targetUrl);
         const options = {
           hostname: parsedUrl.hostname,
@@ -490,13 +742,13 @@ ipcMain.handle('update-occurrence', async (event, data) => {
             'Content-Length': Buffer.byteLength(payload)
           }
         };
-        
+
         const req = https.request(options, (res) => {
           // Seguir redirecionamentos
           if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
             const redirectUrl = res.headers.location;
             console.log(`Redirecionando POST para: ${redirectUrl}`);
-            
+
             // Para redirecionamentos 307 e 308, manter POST
             // Para 301 e 302, usar GET
             if (res.statusCode === 307 || res.statusCode === 308) {
@@ -513,20 +765,20 @@ ipcMain.handle('update-occurrence', async (event, data) => {
             }
             return;
           }
-          
+
           let responseData = '';
           res.on('data', (chunk) => { responseData += chunk; });
           res.on('end', () => {
             resolve(responseData);
           });
         });
-        
+
         req.on('error', reject);
         req.write(payload);
         req.end();
       });
     };
-    
+
     return new Promise((resolve, reject) => {
       postWithRedirects(GOOGLE_SHEETS_URL, postData)
         .then(responseData => {
@@ -548,7 +800,7 @@ ipcMain.handle('update-occurrence', async (event, data) => {
           reject({ success: false, message: 'Erro ao atualizar: ' + error.message });
         });
     });
-    
+
   } catch (error) {
     console.error('Erro ao atualizar ocorrência:', error);
     return { success: false, message: error.message };
@@ -559,27 +811,27 @@ ipcMain.handle('update-occurrence', async (event, data) => {
 ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
   try {
     const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxY_nB8LrroSxy6KHSb1Jxkm4otWeK0rSjP6OGtGIk63WPcDbXbSv5C9gsCknAEIZRm/exec";
-    
+
     if (!GOOGLE_SHEETS_URL) {
       return { success: false, message: 'Google Sheets URL não configurada' };
     }
-    
+
     if (!numeroGenesis) {
       return { success: false, message: 'Número Genesis não fornecido' };
     }
-    
+
     const https = require('https');
     const url = require('url');
-    
+
     const deleteData = {
       action: 'delete',
       numeroGenesis: numeroGenesis
     };
-    
+
     console.log('Enviando exclusão para Google Sheets:', deleteData);
-    
+
     const postData = JSON.stringify(deleteData);
-    
+
     // Função recursiva para seguir redirecionamentos em POST
     const postWithRedirects = (targetUrl, payload, maxRedirects = 5) => {
       return new Promise((resolve, reject) => {
@@ -587,7 +839,7 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
           reject(new Error('Muitos redirecionamentos'));
           return;
         }
-        
+
         const parsedUrl = url.parse(targetUrl);
         const options = {
           hostname: parsedUrl.hostname,
@@ -598,13 +850,13 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
             'Content-Length': Buffer.byteLength(payload)
           }
         };
-        
+
         const req = https.request(options, (res) => {
           // Seguir redirecionamentos
           if (res.statusCode === 302 || res.statusCode === 301 || res.statusCode === 307 || res.statusCode === 308) {
             const redirectUrl = res.headers.location;
             console.log(`Redirecionando DELETE para: ${redirectUrl}`);
-            
+
             // Para redirecionamentos 307 e 308, manter POST
             // Para 301 e 302, usar GET
             if (res.statusCode === 307 || res.statusCode === 308) {
@@ -621,20 +873,20 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
             }
             return;
           }
-          
+
           let responseData = '';
           res.on('data', (chunk) => { responseData += chunk; });
           res.on('end', () => {
             resolve(responseData);
           });
         });
-        
+
         req.on('error', reject);
         req.write(payload);
         req.end();
       });
     };
-    
+
     return new Promise((resolve, reject) => {
       postWithRedirects(GOOGLE_SHEETS_URL, postData)
         .then(responseData => {
@@ -656,7 +908,7 @@ ipcMain.handle('delete-occurrence', async (event, numeroGenesis) => {
           reject({ success: false, message: 'Erro ao excluir: ' + error.message });
         });
     });
-    
+
   } catch (error) {
     console.error('Erro ao excluir ocorrência:', error);
     return { success: false, message: error.message };
@@ -670,13 +922,13 @@ ipcMain.handle('export-occurrences', async (event) => {
     if (!fs.existsSync(FOLDERS.ocorrencias)) {
       return { success: false, message: 'Nenhuma ocorrência encontrada' };
     }
-    
+
     const files = fs.readdirSync(FOLDERS.ocorrencias).filter(f => f.endsWith('.json'));
-    
+
     if (files.length === 0) {
       return { success: false, message: 'Nenhuma ocorrência encontrada' };
     }
-    
+
     // Preparar dados para exportação (ordem do formulário)
     const worksheetData = [
       [
@@ -702,13 +954,13 @@ ipcMain.handle('export-occurrences', async (event) => {
         'Registrado Por'
       ]
     ];
-    
+
     files.forEach(file => {
       try {
         const filePath = path.join(FOLDERS.ocorrencias, file);
         const content = fs.readFileSync(filePath, 'utf8');
         const data = JSON.parse(content);
-        
+
         worksheetData.push([
           new Date(data.metadata.dataRegistro).toLocaleString('pt-BR'),
           data.ocorrencia.numeroGenesis,
@@ -735,27 +987,27 @@ ipcMain.handle('export-occurrences', async (event) => {
         console.error('Erro ao processar arquivo:', file, err);
       }
     });
-    
+
     // Criar workbook
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    
+
     // Ajustar largura das colunas
     const columnWidths = worksheetData[0].map(() => ({ wch: 20 }));
     worksheet['!cols'] = columnWidths;
-    
+
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Todas Ocorrências');
-    
+
     // Salvar arquivo em C:\SECRIMPO\Exportacao
     const dateStr = formatDateForFilename();
     const exportFilename = `[EXPORTACAO][${dateStr}].xlsx`;
     const exportPath = path.join(FOLDERS.exportacoes, exportFilename);
-    
+
     XLSX.writeFile(workbook, exportPath);
     console.log('✓ Exportação salva em:', exportPath);
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: 'Exportação concluída com sucesso',
       filePath: exportPath
     };
@@ -770,7 +1022,7 @@ ipcMain.handle('print-termo-apreensao', async (event, occurrenceData) => {
   try {
     const fs = require('fs');
     const os = require('os');
-    
+
     // Criar janela temporária para gerar o PDF
     const tempWindow = new BrowserWindow({
       width: 800,
@@ -885,7 +1137,7 @@ ipcMain.handle('print-termo-apreensao', async (event, occurrenceData) => {
 ipcMain.handle('print-pdf', async (event, pdfPath) => {
   try {
     const fs = require('fs');
-    
+
     if (!fs.existsSync(pdfPath)) {
       return { success: false, message: 'Arquivo PDF não encontrado' };
     }
@@ -928,36 +1180,36 @@ ipcMain.handle('extract-file-data', async (event, filePath) => {
   try {
     console.log('=== INICIANDO EXTRAÇÃO DE ARQUIVO ===');
     console.log('Arquivo:', filePath);
-    
+
     // Verificar se o arquivo existe
     if (!fs.existsSync(filePath)) {
       throw new Error('Arquivo não encontrado: ' + filePath);
     }
-    
+
     const fileExtractor = require('./scripts/fileExtractor');
     console.log('Módulo fileExtractor carregado com sucesso');
-    
+
     // Extrair texto do arquivo
     console.log('Iniciando extração de texto...');
     const text = await fileExtractor.extractTextFromFile(filePath);
     console.log('Texto extraído com sucesso!');
     console.log('Tamanho do texto:', text.length, 'caracteres');
     console.log('Primeiros 500 caracteres:', text.substring(0, 500));
-    
+
     // Extrair campos específicos do texto
     console.log('Extraindo campos específicos...');
     const extractedFields = fileExtractor.extractFieldsFromText(text);
     console.log('Campos extraídos:', JSON.stringify(extractedFields, null, 2));
-    
+
     // Mapear para o formato do formulário
     console.log('Mapeando dados para o formulário...');
     const formData = fileExtractor.mapFieldsToForm(extractedFields);
     console.log('Dados mapeados:', JSON.stringify(formData, null, 2));
-    
+
     console.log('=== EXTRAÇÃO CONCLUÍDA COM SUCESSO ===');
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       data: formData,
       message: 'Dados extraídos com sucesso'
     };
@@ -965,8 +1217,8 @@ ipcMain.handle('extract-file-data', async (event, filePath) => {
     console.error('=== ERRO NA EXTRAÇÃO ===');
     console.error('Mensagem:', error.message);
     console.error('Stack:', error.stack);
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: error.message || 'Erro ao processar arquivo'
     };
   }
@@ -976,10 +1228,10 @@ ipcMain.handle('extract-file-data', async (event, filePath) => {
 ipcMain.handle('get-active-users-count', async (event) => {
   return new Promise((resolve, reject) => {
     const isDev = !app.isPackaged;
-    
+
     let pythonCommand;
     let pythonArgs;
-    
+
     if (isDev) {
       // Desenvolvimento: usar Python script diretamente
       const pythonScript = path.join(__dirname, '../auth/get_online_users.py');
@@ -988,7 +1240,7 @@ ipcMain.handle('get-active-users-count', async (event) => {
     } else {
       // Produção: usar executável compilado (se existir)
       const exePath = path.join(process.resourcesPath, 'auth/get_online_users.exe');
-      
+
       if (fs.existsSync(exePath)) {
         pythonCommand = exePath;
         pythonArgs = [];
@@ -999,26 +1251,26 @@ ipcMain.handle('get-active-users-count', async (event) => {
         pythonArgs = [pythonScript];
       }
     }
-    
+
     const pythonProcess = spawn(pythonCommand, pythonArgs);
-    
+
     let dataString = '';
     let errorString = '';
-    
+
     pythonProcess.stdout.on('data', (data) => {
       dataString += data.toString();
     });
-    
+
     pythonProcess.stderr.on('data', (data) => {
       errorString += data.toString();
     });
-    
+
     pythonProcess.on('close', (code) => {
       try {
         // Extrair JSON da saída
         const lines = dataString.trim().split('\n');
         let jsonString = '';
-        
+
         for (const line of lines) {
           const trimmedLine = line.trim();
           if (trimmedLine.startsWith('{')) {
@@ -1026,7 +1278,7 @@ ipcMain.handle('get-active-users-count', async (event) => {
             break;
           }
         }
-        
+
         if (jsonString) {
           const result = JSON.parse(jsonString);
           if (result.success) {
@@ -1044,7 +1296,7 @@ ipcMain.handle('get-active-users-count', async (event) => {
         resolve(1); // Fallback: 1 usuário
       }
     });
-    
+
     pythonProcess.on('error', (error) => {
       console.error('Erro ao executar script de usuários online:', error);
       resolve(1); // Fallback: 1 usuário

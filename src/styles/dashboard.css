@@ -4,6 +4,52 @@
     box-sizing: border-box;
 }
 
+/* Otimizações de Performance */
+html {
+    /* Suavização de fontes */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Aceleração por hardware */
+    transform: translate3d(0, 0, 0);
+}
+
+/* Força aceleração por hardware em elementos animados */
+.modal-content,
+.stat-card,
+.chart-container,
+.btn-refresh,
+.btn-export,
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    will-change: transform;
+}
+
+/* Otimização para modais - reduz repaints */
+.modal {
+    contain: layout style paint;
+}
+
+.modal-content {
+    contain: layout style paint;
+    /* Força criação de layer composta */
+    transform: translateZ(0);
+}
+
+/* Otimização para tabelas - reduz reflows */
+.occurrences-table {
+    contain: layout style;
+}
+
+/* Desabilita animações em dispositivos com preferência por movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #f0f2f5;
@@ -257,11 +303,14 @@ body {
     align-items: center;
     gap: 20px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
+    /* Otimizado para GPU com transform3d */
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
+    transform: translate3d(0, -3px, 0);
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
 }
 
@@ -328,12 +377,15 @@ body {
     padding: 30px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     min-height: 420px;
-    transition: all 0.3s ease;
+    /* Otimizado para GPU */
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .chart-container:hover {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
 }
 
 .chart-header {
@@ -630,7 +682,8 @@ body {
 }
 
 .occurrences-table tbody tr {
-    transition: all 0.2s ease;
+    /* Transição otimizada apenas para background-color */
+    transition: background-color 0.15s ease;
 }
 
 .occurrences-table tbody tr:hover {
@@ -780,7 +833,7 @@ body {
     box-shadow: 0 6px 20px rgba(204, 51, 51, 0.4);
 }
 
-/* Modal */
+/* Modal - Otimizado para Performance */
 .modal {
     display: none;
     position: fixed;
@@ -792,7 +845,7 @@ body {
     z-index: 2000;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(5px);
+    /* Removido backdrop-filter que causa baixo FPS */
 }
 
 .modal.active {
@@ -809,21 +862,24 @@ body {
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    animation: modalSlideIn 0.3s ease;
+    /* Animação otimizada usando transform3d para aceleração por hardware */
+    transform: translate3d(0, 0, 0);
+    animation: modalSlideIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .modal-small {
     max-width: 500px;
 }
 
+/* Animação otimizada para GPU */
 @keyframes modalSlideIn {
     from {
         opacity: 0;
-        transform: translateY(-50px);
+        transform: translate3d(0, -30px, 0) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translate3d(0, 0, 0) scale(1);
     }
 }
 
@@ -1083,4 +1139,349 @@ body {
     height: 24px;
     color: #279b4d;
     flex-shrink: 0;
+}
+/* Estilos do botão de anexo removidos - funcionalidade movida para o modal */
+
+/* Modal de anexar PDF */
+.file-upload-area {
+    margin: 20px 0;
+}
+
+.upload-zone {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #fafafa;
+}
+
+.upload-zone:hover {
+    border-color: #FF9800;
+    background: #fff3e0;
+}
+
+.upload-zone .upload-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    color: #666;
+}
+
+.upload-zone p {
+    margin: 8px 0;
+    color: #666;
+}
+
+.upload-zone .file-info {
+    font-size: 12px;
+    color: #999;
+}
+
+.selected-file {
+    margin-top: 16px;
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.selected-file span {
+    font-weight: 500;
+    color: #333;
+}
+
+.attach-info {
+    background: #e3f2fd;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    border-left: 4px solid #2196F3;
+}
+
+.attach-info strong {
+    color: #1976D2;
+}
+
+/* Melhorar o layout dos botões de ação */
+.action-buttons {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    min-width: 32px;
+    height: 32px;
+    padding: 6px;
+}
+
+/* Responsividade para botões de ação */
+@media (max-width: 768px) {
+    .action-buttons {
+        gap: 2px;
+    }
+    
+    .btn-action {
+        min-width: 28px;
+        height: 28px;
+        padding: 4px;
+    }
+    
+    .btn-action svg {
+        width: 16px;
+        height: 16px;
+    }
+}/* Seç
+ão de anexos no modal */
+.attachments-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+}
+
+.no-attachments {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.attachment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: white;
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.attachment-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 12px;
+    color: #f44336;
+}
+
+.attachment-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.attachment-name {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.attachment-meta {
+    font-size: 12px;
+    color: #666;
+}
+
+.attachment-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-attachment {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-attachment svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-attachment.btn-view {
+    background: #2196F3;
+    color: white;
+}
+
+.btn-attachment.btn-view:hover {
+    background: #1976D2;
+}
+
+.btn-attachment.btn-download {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-attachment.btn-download:hover {
+    background: #388E3C;
+}
+
+.btn-attachment.btn-remove {
+    background: #f44336;
+    color: white;
+}
+
+.btn-attachment.btn-remove:hover {
+    background: #d32f2f;
+}
+
+.attachment-actions {
+    margin-top: 12px;
+    text-align: center;
+}
+
+.btn-attach-new {
+    background: #FF9800;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn-attach-new:hover {
+    background: #F57C00;
+    transform: translateY(-1px);
+}
+
+.btn-attach-new svg {
+    width: 16px;
+    height: 16px;
+}/
+* Loading de anexos */
+.loading-attachments {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+.loading-attachments span {
+    display: inline-block;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.no-attachments.error {
+    color: #f44336;
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+    padding: 12px;
+    border-radius: 4px;
+}/* Indicado
+res de anexo na tabela */
+.occurrence-number {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.attachment-indicator {
+    font-size: 16px;
+    display: none; /* Oculto por padrão */
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    transition: all 0.3s ease;
+}
+
+.attachment-indicator.has-attachments {
+    display: inline-flex;
+    color: #2e7d32;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to { 
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Melhorar a aparência da tabela */
+.occurrences-table tbody tr:hover .attachment-indicator.has-attachments {
+    transform: scale(1.1);
+}
+
+/* Tooltip melhorado para indicadores */
+.attachment-indicator[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+.attachment-indicator[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+}/* Indicad
+or no cabeçalho da tabela */
+.attachment-header-info {
+    font-size: 12px;
+    opacity: 0.6;
+    margin-left: 4px;
+    cursor: help;
+}
+
+.attachment-header-info:hover {
+    opacity: 1;
+}
+
+/* Melhorar responsividade dos indicadores */
+@media (max-width: 768px) {
+    .occurrence-number {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .attachment-indicator {
+        font-size: 12px;
+        min-width: 16px;
+        height: 16px;
+    }
 }

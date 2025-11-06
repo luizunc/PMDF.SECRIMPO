@@ -21,6 +21,7 @@
     "dotenv": "^16.3.1",
     "flatpickr": "^4.6.13",
     "mammoth": "^1.11.0",
+    "node-fetch": "^2.7.0",
     "pdfjs-dist": "^4.8.69",
     "tesseract.js": "^6.0.1",
     "xlsx": "^0.18.5"
