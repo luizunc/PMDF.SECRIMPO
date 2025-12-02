@@ -4,9 +4,9 @@ from keyauth import api
 
 # Credenciais KeyAuth
 keyauthapp = api(
-    name="SECRIMPO_PMDF",
-    ownerid="4Roety0GwG",
-    version="1.0",
+    name="Credencial Removida",
+    ownerid="Credencial Removida",
+    version="Credencial Removida",
     hash_to_check=""  # Hash vazio - não verificar integridade do executável
 )
 

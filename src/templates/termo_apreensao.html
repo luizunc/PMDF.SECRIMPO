@@ -169,16 +169,62 @@
             border: 1px solid #d0d0d0;
             padding: 10px 12px;
             background: #fafafa;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            height: auto;
+        }
+
+        /* Garantir que campos de texto possam expandir */
+        table td input[type="text"] {
+            min-height: 30px;
+            height: auto;
+            line-height: 1.4;
         }
 
         table td input,
-        table td textarea {
+        table td textarea,
+        table td select {
             width: 100%;
             border: none;
             padding: 5px;
             font-size: 10pt;
             background: transparent;
             resize: none;
+            color: #000 !important;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+            word-break: break-word;
+            min-height: 20px;
+            box-sizing: border-box;
+        }
+
+        table td input[readonly],
+        table td textarea[readonly],
+        table td select[disabled] {
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+            word-break: break-word;
+            height: auto;
+            min-height: 20px;
+            color: #000 !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+
+        /* Remover aparência de dropdown do select quando desabilitado */
+        table td select[disabled] {
+            background: transparent !important;
+            cursor: default;
+        }
+
+        table td select[disabled]::-ms-expand {
+            display: none;
         }
 
         .content-wrapper {
@@ -205,8 +251,8 @@
         /* Label styles */
         .label-page {
             page-break-before: always;
-            width: 148mm;
-            height: 210mm;
+            width: 110mm; /* 11cm */
+            height: 95mm; /* 9,5cm */
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -214,11 +260,11 @@
 
         /* Container principal da etiqueta */
         .label-container {
-            width: 148mm;
-            height: 210mm;
-            border: 3px solid #000;
+            width: 110mm; /* 11cm */
+            height: 95mm; /* 9,5cm */
+            border: none; /* Removida borda externa */
             background: white;
-            padding: 20px;
+            padding: 15px;
             margin: 0;
             font-family: Arial, sans-serif;
             box-sizing: border-box;
@@ -226,9 +272,9 @@
 
         /* Cabeçalho da etiqueta */
         .label-header {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             border-bottom: 2px solid #000;
-            padding-bottom: 15px;
+            padding-bottom: 8px;
         }
 
         .label-logo-row {
@@ -245,8 +291,8 @@
         }
 
         .label-logo {
-            width: 80px;
-            height: 80px;
+            width: 50px;
+            height: 50px;
             object-fit: contain;
         }
 
@@ -255,7 +301,7 @@
         }
 
         .label-header-text {
-            font-size: 12px;
+            font-size: 10px;
             font-weight: bold;
             color: #000;
             margin: 0;
@@ -266,15 +312,15 @@
         .etiqueta-title {
             text-align: center;
             flex: 1;
-            margin: 0 20px;
+            margin: 0 10px;
         }
 
         .title-line {
-            font-size: 14px;
+            font-size: 11px;
             font-weight: bold;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             color: #000;
-            line-height: 1.2;
+            line-height: 1.1;
         }
 
         /* Logo GDF */
@@ -310,7 +356,7 @@
         /* Campos da etiqueta */
         .label-field {
             border: 2px solid #000;
-            min-height: 60px;
+            min-height: 40px;
             display: flex;
             flex-direction: column;
         }
@@ -327,21 +373,21 @@
         .label-field-header {
             background: #000;
             color: white;
-            padding: 8px 12px;
-            font-size: 12px;
+            padding: 5px 8px;
+            font-size: 10px;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
 
         /* Valor dos campos */
         .label-field-content {
-            padding: 15px 12px;
-            font-size: 16px;
+            padding: 8px 8px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
-            min-height: 20px;
+            min-height: 15px;
             background: white;
             color: #000;
             flex: 1;
@@ -354,20 +400,20 @@
         .label-field-dark {
             background: #000;
             color: white;
-            padding: 8px 12px;
-            font-size: 12px;
+            padding: 5px 8px;
+            font-size: 10px;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
         }
 
         .label-field-light {
-            padding: 15px 12px;
-            font-size: 16px;
+            padding: 8px 8px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
             background: white;
-            min-height: 20px;
+            min-height: 15px;
         }
 
         .label-col {
@@ -384,8 +430,8 @@
         .label-proprietario-header {
             background: #000;
             color: white;
-            padding: 8px 12px;
-            font-size: 12px;
+            padding: 5px 8px;
+            font-size: 10px;
             font-weight: bold;
             text-align: center;
             text-transform: uppercase;
@@ -393,11 +439,11 @@
 
         .label-proprietario-content {
             background: white;
-            padding: 15px 12px;
-            font-size: 16px;
+            padding: 8px 8px;
+            font-size: 13px;
             font-weight: bold;
             text-align: center;
-            min-height: 20px;
+            min-height: 15px;
         }
 
         .label-doc-row {
@@ -407,8 +453,8 @@
         .label-doc-header {
             background: #000;
             color: white;
-            padding: 8px 12px;
-            font-size: 12px;
+            padding: 5px 8px;
+            font-size: 10px;
             font-weight: bold;
             text-align: center;
             border-right: 2px solid #000;
@@ -416,13 +462,26 @@
             text-transform: uppercase;
         }
 
-        .label-doc-content {
-            background: white;
-            padding: 15px 12px;
-            font-size: 16px;
-            font-weight: bold;
+        /* Linha tracejada para corte */
+        .cut-line {
+            border-top: 2px dashed #000;
+            margin: 6px 0;
+            width: 100%;
             text-align: center;
-            flex: 1;
+            position: relative;
+        }
+
+        .cut-line::after {
+            content: "CORTAR AQUI";
+            position: absolute;
+            top: -7px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 0 4px;
+            font-size: 7px;
+            font-weight: bold;
+            color: #000;
         }
 
         @media print {
@@ -456,8 +515,14 @@
             }
 
             table td input,
-            table td textarea {
+            table td textarea,
+            table td select {
                 border: none !important;
+                color: #000 !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                white-space: normal !important;
+                overflow: visible !important;
             }
 
             .section-title {
@@ -466,13 +531,13 @@
 
             .label-page {
                 page-break-before: always;
-                width: 148mm !important;
-                height: 210mm !important;
+                width: 110mm !important; /* 11cm */
+                height: 95mm !important; /* 9,5cm */
             }
 
             .label-container {
-                width: 148mm !important;
-                height: 210mm !important;
+                width: 110mm !important; /* 11cm */
+                height: 95mm !important; /* 9,5cm */
             }
         }
     </style>
@@ -518,6 +583,10 @@
                 <label>Artigo</label>
                 <input type="text" id="artigo" readonly>
             </div>
+            <div class="form-group">
+                <label>Status</label>
+                <input type="text" id="status" readonly>
+            </div>
         </div>
 
         <div class="section-title">Itens Apreendidos</div>
@@ -533,8 +602,10 @@
             </thead>
             <tbody>
                 <tr>
-                    <td><input type="text" id="especie" readonly></td>
-                    <td><input type="text" id="item" readonly></td>
+                    <td>
+                        <input type="text" id="especie" readonly>
+                    </td>
+                    <td><textarea id="item" rows="2" readonly style="min-height: 40px;"></textarea></td>
                     <td><input type="text" id="quantidade" readonly></td>
                     <td><textarea id="descricaoItem" rows="3" readonly></textarea></td>
                 </tr>
@@ -669,11 +740,58 @@
                     <div class="label-field-content" id="labelDocumento"></div>
                 </div>
             </div>
+
+            <!-- Linha tracejada para corte -->
+            <div class="cut-line"></div>
+
+            <!-- Nº PJE -->
+            <div class="label-row">
+                <div class="label-col" style="flex: 1;">
+                    <div class="label-field-header">Nº PJE</div>
+                    <div class="label-field-content" id="labelNumeroPje"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // This script will be populated by the main process
+        const { ipcRenderer } = require('electron');
+        
+        // Marcar que o listener está pronto
+        window.ipcListenerReady = false;
+        
+        // Listener para receber dados via IPC
+        ipcRenderer.on('populate-termo-data', (event, data) => {
+            try {
+                console.log('Dados recebidos via IPC');
+                window.occurrenceData = data;
+                if (typeof populateForm === 'function') {
+                    populateForm(window.occurrenceData);
+                    // Enviar confirmação de sucesso
+                    ipcRenderer.send('termo-data-populated', true);
+                } else {
+                    console.error('Função populateForm não encontrada');
+                    ipcRenderer.send('termo-data-populated', false);
+                }
+            } catch (error) {
+                console.error('Erro ao preencher formulário:', error);
+                ipcRenderer.send('termo-data-populated', false);
+            }
+        });
+        
+        // Marcar listener como pronto quando o DOM estiver carregado
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            window.ipcListenerReady = true;
+        } else {
+            window.addEventListener('DOMContentLoaded', () => {
+                window.ipcListenerReady = true;
+            });
+            window.addEventListener('load', () => {
+                window.ipcListenerReady = true;
+            });
+        }
+        
+        // Fallback: verificar se dados já estão disponíveis
         window.addEventListener('DOMContentLoaded', () => {
             if (window.occurrenceData) {
                 populateForm(window.occurrenceData);
@@ -687,10 +805,22 @@
             document.getElementById('dataApreensao').value = formatDate(data.ocorrencia.dataApreensao) || '';
             document.getElementById('leiInfringida').value = data.ocorrencia.leiInfrigida || '';
             document.getElementById('artigo').value = data.ocorrencia.artigo || '';
+            document.getElementById('status').value = data.ocorrencia.status || '';
             
-            document.getElementById('especie').value = data.itemApreendido.especie || '';
-            document.getElementById('item').value = data.itemApreendido.item || '';
-            document.getElementById('quantidade').value = `${data.itemApreendido.quantidade || ''} ${data.itemApreendido.unidadeMedida || ''}`.trim();
+            // Espécie agora é um input, não select
+            const especieInput = document.getElementById('especie');
+            if (especieInput) {
+                especieInput.value = data.itemApreendido.especie || '';
+            }
+            // Item agora é um textarea
+            const itemTextarea = document.getElementById('item');
+            if (itemTextarea) {
+                itemTextarea.value = data.itemApreendido.item || '';
+                // Ajustar altura automaticamente
+                itemTextarea.style.height = 'auto';
+                itemTextarea.style.height = (itemTextarea.scrollHeight) + 'px';
+            }
+            document.getElementById('quantidade').value = data.itemApreendido.quantidade || '';
             document.getElementById('descricaoItem').value = data.itemApreendido.descricao || '';
             
             document.getElementById('nomeProprietario').value = data.proprietario.nome || '';
@@ -711,12 +841,16 @@
             document.getElementById('labelDataApreensao').textContent = formatDate(data.ocorrencia.dataApreensao) || '';
             document.getElementById('labelItemApreendido').textContent = data.itemApreendido.especie || '';
             document.getElementById('labelNomeItem').textContent = data.itemApreendido.item || '';
-            document.getElementById('labelQuantidade').textContent = `${data.itemApreendido.quantidade || ''} ${data.itemApreendido.unidadeMedida || ''}`.trim();
+            document.getElementById('labelQuantidade').textContent = data.itemApreendido.quantidade || '';
             document.getElementById('labelValor').textContent = '-';
-            document.getElementById('labelPeso').textContent = `${data.itemApreendido.quantidade || ''} ${data.itemApreendido.unidadeMedida || ''}`.trim();
+            document.getElementById('labelPeso').textContent = data.itemApreendido.quantidade || '';
             document.getElementById('labelNumeroSerie').textContent = '-';
             document.getElementById('labelProprietario').textContent = (data.proprietario.nome || '').toUpperCase();
             document.getElementById('labelDocumento').textContent = numeroDoc;
+            
+            // Nº PJE - mostrar valor ou "-" se vazio
+            const numeroPje = data.ocorrencia.numeroPje || '';
+            document.getElementById('labelNumeroPje').textContent = numeroPje.trim() !== '' ? numeroPje : '-';
 
             // Adicionar data de geração
             const now = new Date();

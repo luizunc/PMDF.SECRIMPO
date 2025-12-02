@@ -1,11 +1,11 @@
 const { ipcRenderer } = require('electron');
-const Chart = require('chart.js/auto');
 
 // Elements
 const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
 const logoutBtn = document.getElementById('logoutBtn');
+const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingText = document.getElementById('loadingText');
 const loadingSubtext = document.getElementById('loadingSubtext');
@@ -13,11 +13,13 @@ const loadingSubtext = document.getElementById('loadingSubtext');
 // Tabs
 const tabDashboard = document.getElementById('tabDashboard');
 const tabOcorrencias = document.getElementById('tabOcorrencias');
+const tabTCO = document.getElementById('tabTCO');
 const tabNovaOcorrencia = document.getElementById('tabNovaOcorrencia');
 
 // Sections
 const sectionDashboard = document.getElementById('sectionDashboard');
 const sectionOcorrencias = document.getElementById('sectionOcorrencias');
+const sectionTCO = document.getElementById('sectionTCO');
 
 // Stats
 const statTotal = document.getElementById('statTotal');
@@ -27,11 +29,23 @@ const statUsuarios = document.getElementById('statUsuarios');
 
 // Table
 const occurrencesTableBody = document.getElementById('occurrencesTableBody');
-const searchInput = document.getElementById('searchInput');
 const exportBtn = document.getElementById('exportBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const emptyState = document.getElementById('emptyState');
 const btnNovaOcorrenciaEmpty = document.getElementById('btnNovaOcorrenciaEmpty');
+
+// Filter elements
+const filterBtn = document.getElementById('filterBtn');
+const filterModal = document.getElementById('filterModal');
+const filterModalClose = document.getElementById('filterModalClose');
+const btnApplyFilters = document.getElementById('btnApplyFilters');
+const btnClearFilters = document.getElementById('btnClearFilters');
+
+const filterBtnTCO = document.getElementById('filterBtnTCO');
+const filterModalTCO = document.getElementById('filterModalTCO');
+const filterModalTCOClose = document.getElementById('filterModalTCOClose');
+const btnApplyFiltersTCO = document.getElementById('btnApplyFiltersTCO');
+const btnClearFiltersTCO = document.getElementById('btnClearFiltersTCO');
 
 // Modals
 const viewModal = document.getElementById('viewModal');
@@ -53,59 +67,42 @@ const printOccurrenceId = document.getElementById('printOccurrenceId');
 const btnCancelPrint = document.getElementById('btnCancelPrint');
 const btnPrintTermoApreensao = document.getElementById('btnPrintTermoApreensao');
 
-const attachModal = document.getElementById('attachModal');
-const attachModalClose = document.getElementById('attachModalClose');
-const attachOccurrenceId = document.getElementById('attachOccurrenceId');
-const btnCancelAttach = document.getElementById('btnCancelAttach');
-// btnSelectPDF removido - não existe no HTML
-const pdfFileInput = document.getElementById('pdfFileInput');
-const selectedFileName = document.getElementById('selectedFileName');
-const btnUploadPDF = document.getElementById('btnUploadPDF');
+const exportFilterModal = document.getElementById('exportFilterModal');
+const exportFilterModalClose = document.getElementById('exportFilterModalClose');
+const btnCancelExportFilter = document.getElementById('btnCancelExportFilter');
+const btnConfirmExportFilter = document.getElementById('btnConfirmExportFilter');
+
+const exportTCOFilterModal = document.getElementById('exportTCOFilterModal');
+const exportTCOFilterModalClose = document.getElementById('exportTCOFilterModalClose');
+const btnCancelExportTCOFilter = document.getElementById('btnCancelExportTCOFilter');
+const btnConfirmExportTCOFilter = document.getElementById('btnConfirmExportTCOFilter');
+
+const updateModal = document.getElementById('updateModal');
+const updateModalClose = document.getElementById('updateModalClose');
+const btnUpdateLater = document.getElementById('btnUpdateLater');
+const btnDownloadUpdate = document.getElementById('btnDownloadUpdate');
+const currentVersionDisplay = document.getElementById('currentVersionDisplay');
+const latestVersionDisplay = document.getElementById('latestVersionDisplay');
+const releaseNotesContent = document.getElementById('releaseNotesContent');
 
 // State
 let allOccurrences = [];
 let filteredOccurrences = [];
 let currentOccurrence = null;
 let isEditMode = false;
+let activeFilters = {
+    numeroGenesis: '',
+    dataInicial: '',
+    dataFinal: '',
+    unidade: '',
+    status: ''
+};
+let activeFiltersTCO = {
+    rap: '',
+    ilicito: '',
+    item: ''
+};
 
-// Cache para anexos
-let attachmentsCache = new Map();
-
-// Charts - Ocorrências Gerais
-let lineChart = null;
-let pieChartMonth = null;
-let barChartDay = null;
-
-// Charts - Unidade
-let pieChartUnidadePeriodo = null;
-let pieChartUnidadeMes = null;
-let barChartUnidadeDia = null;
-
-// Charts - Itens
-let pieChartItensPeriodo = null;
-let pieChartItensMes = null;
-let barChartItensDia = null;
-
-// Date filter
-let customDateRange = null; // { startDate: Date, endDate: Date }
-const filterDataInicio = document.getElementById('filterDataInicio');
-const filterDataFim = document.getElementById('filterDataFim');
-const btnFilterChart = document.getElementById('btnFilterChart');
-const btnResetFilter = document.getElementById('btnResetFilter');
-
-// Date filter for Unidade chart
-let customDateRangeUnidade = null;
-const filterDataInicioUnidade = document.getElementById('filterDataInicioUnidade');
-const filterDataFimUnidade = document.getElementById('filterDataFimUnidade');
-const btnFilterChartUnidade = document.getElementById('btnFilterChartUnidade');
-const btnResetFilterUnidade = document.getElementById('btnResetFilterUnidade');
-
-// Date filter for Itens chart
-let customDateRangeItens = null;
-const filterDataInicioItens = document.getElementById('filterDataInicioItens');
-const filterDataFimItens = document.getElementById('filterDataFimItens');
-const btnFilterChartItens = document.getElementById('btnFilterChartItens');
-const btnResetFilterItens = document.getElementById('btnResetFilterItens');
 
 // Load user info
 window.addEventListener('load', () => {
@@ -131,64 +128,149 @@ function hideLoading() {
 async function loadOccurrences() {
     try {
         const result = await ipcRenderer.invoke('get-occurrences');
-        if (result.success) {
+        if (result.success && result.data) {
+            console.log('Dados recebidos do backend:', JSON.stringify(result.data, null, 2));
+            console.log('Total de itens recebidos:', result.data?.length || 0);
+            
             // Mapear dados do Google Sheets para a estrutura esperada
-            allOccurrences = result.data.map(row => {
+            allOccurrences = result.data.map((row, index) => {
+                console.log(`Mapeando ocorrência ${index}:`, JSON.stringify(row, null, 2));
+                
                 // Se já está na estrutura correta, retorna como está
                 if (row.ocorrencia && row.itemApreendido && row.proprietario && row.policial) {
+                    console.log(`Ocorrência ${index} já está na estrutura correta`);
                     return row;
                 }
-
+                
                 // Caso contrário, mapeia da estrutura do Google Sheets
-                return {
+                // Converter numeroGenesis se vier como data ISO ou formato incorreto
+                let numeroGenesis = row.numeroGenesis || row['Nº Genesis'] || row.numero_genesis || '';
+                
+                // Se vier como data ISO, tentar extrair ou usar um valor padrão
+                if (numeroGenesis && (numeroGenesis.includes('T') || numeroGenesis.includes('Z') || numeroGenesis instanceof Date)) {
+                    console.warn(`numeroGenesis veio como data ISO ou Date: ${numeroGenesis}`);
+                    // Tentar converter Date para string se for objeto Date
+                    if (numeroGenesis instanceof Date) {
+                        numeroGenesis = '';
+                    } else if (typeof numeroGenesis === 'string' && numeroGenesis.includes('T')) {
+                        numeroGenesis = '';
+                    }
+                }
+                
+                // Garantir que seja string e não vazio
+                numeroGenesis = String(numeroGenesis || '').trim();
+                
+                // Se ainda estiver vazio ou for 'N/A', tentar outras fontes
+                if (!numeroGenesis || numeroGenesis === 'N/A' || numeroGenesis === '') {
+                    // Tentar pegar do logRegistro ou gerar um valor temporário
+                    numeroGenesis = row.logRegistro ? String(row.logRegistro).substring(0, 10) : '';
+                }
+                
+                // Converter valores numéricos para strings quando necessário
+                const mapped = {
                     ocorrencia: {
-                        numeroGenesis: row.numeroGenesis || '',
-                        unidade: row.unidade || '',
+                        numeroGenesis: numeroGenesis || '',
+                        unidade: String(row.unidade || ''), // Mantém caracteres especiais como º
                         dataApreensao: row.dataApreensao || '',
-                        leiInfrigida: row.leiInfrigida || '',
-                        artigo: row.artigo || '',
-                        policialCondutor: row.policialCondutor || ''
+                        leiInfrigida: String(row.leiInfrigida || ''),
+                        artigo: String(row.artigo || ''),
+                        status: String(row.status || ''),
+                        numeroPje: String(row.numeroPje || '')
                     },
                     itemApreendido: {
-                        especie: row.especie || '',
-                        item: row.item || '',
-                        quantidade: row.quantidade || '',
-                        unidadeMedida: row.unidadeMedida || '',
-                        descricao: row.descricaoItem || '',
-                        ocorrencia: row.ocorrenciaItem || '',
-                        proprietario: row.proprietarioItem || '',
-                        policial: row.policialItem || ''
+                        especie: String(row.especie || ''),
+                        item: String(row.item || ''),
+                        quantidade: String(row.quantidade || ''),
+                        descricao: String(row.descricaoItem || ''),
+                        ocorrencia: String(row.ocorrenciaItem || ''),
+                        proprietario: String(row.proprietarioItem || ''),
+                        policial: String(row.policialItem || '')
                     },
                     proprietario: {
-                        nome: row.nomeProprietario || '',
-                        dataNascimento: row.dataNascimento || '',
-                        tipoDocumento: row.tipoDocumento || '',
-                        numeroDocumento: row.numeroDocumento || ''
+                        nome: String(row.nomeProprietario || ''),
+                        tipoDocumento: String(row.tipoDocumento || ''),
+                        numeroDocumento: String(row.numeroDocumento || '')
                     },
                     policial: {
-                        nome: row.nomePolicialCompleto || row.nomePolicial || '',
-                        matricula: row.matricula || '',
-                        graduacao: row.graduacao || '',
-                        unidade: row.unidadePolicial || ''
+                        nome: String(row.nomePolicialCompleto || row.nomePolicial || ''),
+                        matricula: String(row.matricula || ''),
+                        graduacao: String(row.graduacao || ''),
+                        unidade: String(row.unidadePolicial || '')
                     },
                     metadata: {
-                        registradoPor: row.registradoPor || '',
+                        registradoPor: String(row.registradoPor || ''),
                         dataRegistro: row.logRegistro || new Date().toISOString()
                     }
                 };
+                
+                console.log(`Ocorrência ${index} mapeada:`, JSON.stringify(mapped, null, 2));
+                return mapped;
             });
-
+            
+            console.log('Total de ocorrências mapeadas:', allOccurrences.length);
+            if (allOccurrences.length > 0) {
+                console.log('Estrutura da primeira ocorrência:', JSON.stringify(allOccurrences[0], null, 2));
+            }
+            
             filteredOccurrences = [...allOccurrences];
             console.log('Ocorrências carregadas:', allOccurrences.length);
+            console.log('filteredOccurrences após cópia:', filteredOccurrences.length);
+            
+            // Verificar se há ocorrências válidas
+            const validOccurrences = allOccurrences.filter(occ => {
+                const hasOcorrencia = occ.ocorrencia && Object.keys(occ.ocorrencia).length > 0;
+                console.log('Ocorrência válida?', hasOcorrencia, occ);
+                return hasOcorrencia;
+            });
+            
+            console.log('Ocorrências válidas:', validOccurrences.length);
+            
+            if (validOccurrences.length > 0) {
+                allOccurrences = validOccurrences;
+            }
+            
+            // Aplicar filtros ativos se houver
+            applyOccurrenceFiltersOnLoad();
+            
             updateStats();
-            renderTable();
         } else {
             console.error('Erro ao carregar ocorrências:', result.message);
-            showEmptyState();
+            
+            // Mostrar mensagem de erro adequada ao usuário
+            if (result.errorType === 'rate_limit') {
+                customAlert.warning(
+                    'Há muitas solicitações sendo feitas ao Google Sheets. Por favor, aguarde alguns instantes e tente novamente clicando no botão "Atualizar".',
+                    'Google Sheets temporariamente indisponível'
+                );
+            } else if (result.message) {
+                customAlert.error('Erro ao carregar dados: ' + result.message);
+            } else {
+                customAlert.error('Erro ao carregar ocorrências do Google Sheets.');
+            }
+            
+            // Manter dados locais se existirem
+            if (allOccurrences.length > 0) {
+                console.log('Mantendo dados locais existentes');
+                filteredOccurrences = [...allOccurrences];
+                updateStats();
+                renderTable();
+            } else {
+                showEmptyState();
+            }
         }
     } catch (error) {
         console.error('Erro ao carregar ocorrências:', error);
-        showEmptyState();
+        customAlert.error('Erro ao carregar ocorrências: ' + error.message);
+        
+        // Manter dados locais se existirem
+        if (allOccurrences.length > 0) {
+            console.log('Mantendo dados locais existentes após erro');
+            filteredOccurrences = [...allOccurrences];
+            updateStats();
+            renderTable();
+        } else {
+            showEmptyState();
+        }
     }
 }
 
@@ -202,8 +284,8 @@ function updateStats() {
     const thisMonth = allOccurrences.filter(occ => {
         if (!occ.metadata?.dataRegistro) return false;
         const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate.getMonth() === now.getMonth() &&
-            occDate.getFullYear() === now.getFullYear();
+        return occDate.getMonth() === now.getMonth() && 
+               occDate.getFullYear() === now.getFullYear();
     }).length;
     statMes.textContent = thisMonth;
 
@@ -214,12 +296,9 @@ function updateStats() {
         return occDate.toDateString() === now.toDateString();
     }).length;
     statHoje.textContent = today;
-
+    
     // Update active users count from KeyAuth
     updateActiveUsers();
-
-    // Update charts
-    updateCharts();
 }
 
 // Update active users count from KeyAuth
@@ -247,37 +326,45 @@ async function updateActiveUsers() {
 
 // Render table
 function renderTable() {
+    console.log('renderTable chamado. filteredOccurrences.length:', filteredOccurrences.length);
+    console.log('filteredOccurrences:', JSON.stringify(filteredOccurrences, null, 2));
+    
     if (filteredOccurrences.length === 0) {
+        console.log('Nenhuma ocorrência filtrada, mostrando estado vazio');
         showEmptyState();
         return;
     }
 
+    console.log('Ocultando estado vazio e renderizando tabela');
     hideEmptyState();
-
-    // Otimização: usar DocumentFragment para reduzir reflows
-    const fragment = document.createDocumentFragment();
-
-    // Limpar tabela de forma otimizada
-    while (occurrencesTableBody.firstChild) {
-        occurrencesTableBody.removeChild(occurrencesTableBody.firstChild);
-    }
+    occurrencesTableBody.innerHTML = '';
 
     filteredOccurrences.forEach((occ, index) => {
         const row = document.createElement('tr');
+        const statusOptions = getStatusOptions(occ.itemApreendido?.especie);
+        const currentStatus = occ.ocorrencia?.status || '';
         
-        // Indicador de anexos (será atualizado dinamicamente)
-        const attachmentIndicator = `<span class="attachment-indicator" id="attachment-${index}"></span>`;
-        
+        // Garantir que numeroGenesis seja exibido corretamente
+        const numeroGenesis = (occ.ocorrencia?.numeroGenesis || '').toString().trim();
         row.innerHTML = `
-            <td>
-                <div class="occurrence-number">
-                    <strong>${occ.ocorrencia?.numeroGenesis || 'N/A'}</strong>
-                    ${attachmentIndicator}
-                </div>
-            </td>
+            <td><strong>${numeroGenesis || 'N/A'}</strong></td>
             <td>${occ.ocorrencia?.dataApreensao ? formatDate(occ.ocorrencia.dataApreensao) : 'N/A'}</td>
             <td>${occ.ocorrencia?.unidade || 'N/A'}</td>
             <td>${occ.proprietario?.nome || 'N/A'}</td>
+            <td>
+                ${statusOptions.length > 0 ? `
+                <select class="status-dropdown" data-index="${index}" onchange="updateStatus(${index}, this.value)">
+                    <option value="">Selecione...</option>
+                    ${statusOptions.map(option => 
+                        `<option value="${option}" ${currentStatus === option ? 'selected' : ''}>${option}</option>`
+                    ).join('')}
+                </select>
+                ` : `
+                <select class="status-dropdown" data-index="${index}" disabled>
+                    <option value="">Selecione primeiro a espécie...</option>
+                </select>
+                `}
+            </td>
             <td>
                 <div class="action-buttons">
                     <button class="btn-action btn-view" onclick="viewOccurrence(${index})" title="Ver detalhes">
@@ -299,7 +386,6 @@ function renderTable() {
                             <rect x="6" y="14" width="12" height="8"/>
                         </svg>
                     </button>
-
                     <button class="btn-action btn-delete-action" onclick="confirmDelete(${index})" title="Excluir">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"/>
@@ -309,41 +395,32 @@ function renderTable() {
                 </div>
             </td>
         `;
-        fragment.appendChild(row);
+        occurrencesTableBody.appendChild(row);
     });
-
-    // Adicionar todas as linhas de uma vez para reduzir reflows
-    occurrencesTableBody.appendChild(fragment);
-    
-    // Verificar anexos para cada ocorrência
-    checkAttachmentsForAllOccurrences();
 }
 
 // View occurrence
-window.viewOccurrence = function (index) {
+window.viewOccurrence = function(index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = false;
     showModal(false);
 };
 
 // Edit occurrence
-window.editOccurrence = function (index) {
+window.editOccurrence = function(index) {
     currentOccurrence = filteredOccurrences[index];
     isEditMode = true;
     showModal(true);
 };
 
-// Show modal 
+// Show modal
 function showModal(editable) {
     if (!currentOccurrence) return;
 
-    // Usar requestAnimationFrame para melhor performance
-    requestAnimationFrame(() => {
+    const modalTitle = document.getElementById('modalTitle');
+    modalTitle.textContent = editable ? 'Editar Ocorrência' : 'Detalhes da Ocorrência';
 
-        const modalTitle = document.getElementById('modalTitle');
-        modalTitle.textContent = editable ? 'Editar Ocorrência' : 'Detalhes da Ocorrência';
-
-        modalBody.innerHTML = `
+    modalBody.innerHTML = `
         <div class="modal-form-section">
             <h3 class="modal-section-title">Dados da Ocorrência</h3>
             <div class="modal-form-grid">
@@ -370,15 +447,21 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Lei Infringida</label>
-                    <input type="text" id="edit-leiInfrigida" value="${currentOccurrence.ocorrencia.leiInfrigida}" ${!editable ? 'disabled' : ''}>
+                    <input type="text" id="edit-leiInfrigida" value="${currentOccurrence.ocorrencia.leiInfrigida || ''}" ${!editable ? 'disabled' : ''}>
                 </div>
                 <div class="modal-form-group">
                     <label>Artigo</label>
-                    <input type="text" id="edit-artigo" value="${currentOccurrence.ocorrencia.artigo}" ${!editable ? 'disabled' : ''}>
+                    <input type="text" id="edit-artigo" value="${currentOccurrence.ocorrencia.artigo || ''}" ${!editable ? 'disabled' : ''}>
                 </div>
                 <div class="modal-form-group">
-                    <label>Policial Condutor</label>
-                    <input type="text" id="edit-policialCondutor" value="${currentOccurrence.ocorrencia.policialCondutor}" ${!editable ? 'disabled' : ''}>
+                    <label>Status</label>
+                    <select id="edit-status" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione primeiro a espécie...</option>
+                    </select>
+                </div>
+                <div class="modal-form-group">
+                    <label>Nº PJE</label>
+                    <input type="text" id="edit-numeroPje" value="${currentOccurrence.ocorrencia.numeroPje || ''}" ${!editable ? 'disabled' : ''}>
                 </div>
             </div>
         </div>
@@ -388,7 +471,17 @@ function showModal(editable) {
             <div class="modal-form-grid">
                 <div class="modal-form-group">
                     <label>Espécie</label>
-                    <input type="text" id="edit-especie" value="${currentOccurrence.itemApreendido.especie}" ${!editable ? 'disabled' : ''}>
+                    ${editable ? `
+                    <select id="edit-especie" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione...</option>
+                        <option value="SUBSTÂNCIA" ${currentOccurrence.itemApreendido.especie === 'SUBSTÂNCIA' ? 'selected' : ''}>SUBSTÂNCIA</option>
+                        <option value="OBJETO" ${currentOccurrence.itemApreendido.especie === 'OBJETO' ? 'selected' : ''}>OBJETO</option>
+                        <option value="SIMULACRO" ${currentOccurrence.itemApreendido.especie === 'SIMULACRO' ? 'selected' : ''}>SIMULACRO</option>
+                        <option value="ARMA BRANCA" ${currentOccurrence.itemApreendido.especie === 'ARMA BRANCA' ? 'selected' : ''}>ARMA BRANCA</option>
+                    </select>
+                    ` : `
+                    <input type="text" id="edit-especie" value="${currentOccurrence.itemApreendido.especie || ''}" disabled>
+                    `}
                 </div>
                 <div class="modal-form-group">
                     <label>Item</label>
@@ -396,7 +489,7 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Quantidade</label>
-                    <input type="text" id="edit-quantidade" value="${currentOccurrence.itemApreendido.quantidade} ${currentOccurrence.itemApreendido.unidadeMedida || ''}" ${!editable ? 'disabled' : ''}>
+                    <input type="text" id="edit-quantidade" value="${currentOccurrence.itemApreendido.quantidade}" ${!editable ? 'disabled' : ''}>
                 </div>
                 <div class="modal-form-group full-width">
                     <label>Descrição</label>
@@ -413,12 +506,16 @@ function showModal(editable) {
                     <input type="text" id="edit-nomeProprietario" value="${currentOccurrence.proprietario.nome}" ${!editable ? 'disabled' : ''}>
                 </div>
                 <div class="modal-form-group">
-                    <label>Data de Nascimento</label>
-                    <input type="text" id="edit-dataNascimento" value="${formatDateBR(currentOccurrence.proprietario.dataNascimento)}" ${!editable ? 'disabled' : ''}>
-                </div>
-                <div class="modal-form-group">
                     <label>Tipo de Documento</label>
-                    <input type="text" id="edit-tipoDocumento" value="${currentOccurrence.proprietario.tipoDocumento}" ${!editable ? 'disabled' : ''}>
+                    ${editable ? `
+                    <select id="edit-tipoDocumento" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione...</option>
+                        <option value="CPF" ${currentOccurrence.proprietario.tipoDocumento === 'CPF' ? 'selected' : ''}>CPF</option>
+                        <option value="RG" ${currentOccurrence.proprietario.tipoDocumento === 'RG' ? 'selected' : ''}>RG</option>
+                    </select>
+                    ` : `
+                    <input type="text" id="edit-tipoDocumento" value="${currentOccurrence.proprietario.tipoDocumento}" disabled>
+                    `}
                 </div>
                 <div class="modal-form-group">
                     <label>Nº Documento</label>
@@ -440,7 +537,27 @@ function showModal(editable) {
                 </div>
                 <div class="modal-form-group">
                     <label>Graduação</label>
-                    <input type="text" id="edit-graduacao" value="${currentOccurrence.policial.graduacao}" ${!editable ? 'disabled' : ''}>
+                    ${editable ? `
+                    <select id="edit-graduacao" ${!editable ? 'disabled' : ''}>
+                        <option value="">Selecione...</option>
+                        <option value="Soldado de 2ª Classe" ${currentOccurrence.policial.graduacao === 'Soldado de 2ª Classe' ? 'selected' : ''}>Soldado 2ª Classe</option>
+                        <option value="Soldado de 1ª Classe" ${currentOccurrence.policial.graduacao === 'Soldado de 1ª Classe' ? 'selected' : ''}>Soldado 1ª Classe</option>
+                        <option value="Cabo" ${currentOccurrence.policial.graduacao === 'Cabo' ? 'selected' : ''}>Cabo</option>
+                        <option value="3º Sargento" ${currentOccurrence.policial.graduacao === '3º Sargento' ? 'selected' : ''}>3º Sargento</option>
+                        <option value="2º Sargento" ${currentOccurrence.policial.graduacao === '2º Sargento' ? 'selected' : ''}>2º Sargento</option>
+                        <option value="1º Sargento" ${currentOccurrence.policial.graduacao === '1º Sargento' ? 'selected' : ''}>1º Sargento</option>
+                        <option value="Subtenente" ${currentOccurrence.policial.graduacao === 'Subtenente' ? 'selected' : ''}>Subtenente</option>
+                        <option value="Aspirante-a-Oficial" ${currentOccurrence.policial.graduacao === 'Aspirante-a-Oficial' ? 'selected' : ''}>Aspirante-a-Oficial</option>
+                        <option value="Segundo-Tenente" ${currentOccurrence.policial.graduacao === 'Segundo-Tenente' ? 'selected' : ''}>Segundo-Tenente</option>
+                        <option value="Primeiro-Tenente" ${currentOccurrence.policial.graduacao === 'Primeiro-Tenente' ? 'selected' : ''}>Primeiro-Tenente</option>
+                        <option value="Capitão" ${currentOccurrence.policial.graduacao === 'Capitão' ? 'selected' : ''}>Capitão</option>
+                        <option value="Major" ${currentOccurrence.policial.graduacao === 'Major' ? 'selected' : ''}>Major</option>
+                        <option value="Tenente-Coronel" ${currentOccurrence.policial.graduacao === 'Tenente-Coronel' ? 'selected' : ''}>Tenente-Coronel</option>
+                        <option value="Coronel" ${currentOccurrence.policial.graduacao === 'Coronel' ? 'selected' : ''}>Coronel</option>
+                    </select>
+                    ` : `
+                    <input type="text" id="edit-graduacao" value="${currentOccurrence.policial.graduacao || ''}" disabled>
+                    `}
                 </div>
                 <div class="modal-form-group">
                     <label>Unidade</label>
@@ -462,284 +579,162 @@ function showModal(editable) {
                 </div>
             </div>
         </div>
-
-        <div class="modal-form-section">
-            <h3 class="modal-section-title">Anexos PDF</h3>
-            <div class="attachments-list" id="attachmentsList">
-                <div class="loading-attachments">
-                    <span>Carregando anexos...</span>
-                </div>
-            </div>
-            ${!editable ? `
-                <div class="attachment-actions">
-                    <button type="button" class="btn-primary btn-attach-new" onclick="openAttachModal(${filteredOccurrences.indexOf(currentOccurrence)})">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.64 16.2a2 2 0 0 1-2.83-2.83l8.49-8.49"/>
-                        </svg>
-                        Anexar PDF
-                    </button>
-                </div>
-            ` : ''}
-        </div>
     `;
 
-        btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
-        btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
-
-        viewModal.classList.add('active');
-
-        // Carregar anexos após abrir o modal
-        if (!editable) {
-            loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
-        }
-    });
-}
-
-// Load attachments from Google Drive
-async function loadAttachments(numeroGenesis) {
-    const attachmentsList = document.getElementById('attachmentsList');
-    if (!attachmentsList) return;
-
-    try {
-        console.log('Carregando anexos para:', numeroGenesis);
-
-        // Mostrar loading
-        attachmentsList.innerHTML = '<div class="loading-attachments"><span>Carregando anexos...</span></div>';
-
-        // Buscar anexos no Google Drive
-        const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
-
-        console.log('Anexos carregados:', result);
-
-        if (result.success && result.attachments.length > 0) {
-            attachmentsList.innerHTML = generateAttachmentsList(result.attachments);
-        } else {
-            attachmentsList.innerHTML = '<p class="no-attachments">Nenhum anexo PDF encontrado.</p>';
-        }
-
-    } catch (error) {
-        console.error('Erro ao carregar anexos:', error);
-        attachmentsList.innerHTML = '<p class="no-attachments error">Erro ao carregar anexos.</p>';
-    }
-}
-
-// Check attachments for all occurrences in the table
-async function checkAttachmentsForAllOccurrences() {
-    const promises = filteredOccurrences.map(async (occ, index) => {
-        try {
-            const numeroGenesis = occ.ocorrencia?.numeroGenesis;
-            if (!numeroGenesis) return;
-
-            const indicator = document.getElementById(`attachment-${index}`);
-            if (!indicator) return;
-
-            // Verificar cache primeiro
-            if (attachmentsCache.has(numeroGenesis)) {
-                const cachedResult = attachmentsCache.get(numeroGenesis);
-                updateIndicatorDisplay(indicator, cachedResult);
-                return;
-            }
-
-            const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
-            
-            // Salvar no cache
-            attachmentsCache.set(numeroGenesis, result);
-            
-            updateIndicatorDisplay(indicator, result);
-        } catch (error) {
-            console.error('Erro ao verificar anexos:', error);
-            const indicator = document.getElementById(`attachment-${index}`);
-            if (indicator) {
-                // Em caso de erro, simplesmente ocultar o indicador
-                indicator.style.display = 'none';
+    btnDelete.style.display = 'none'; // Sempre oculto no modal de edição
+    btnSaveEdit.style.display = editable ? 'inline-flex' : 'none';
+    
+    viewModal.classList.add('active');
+    
+    // Converter sigla antiga para nome completo no campo Lei Infringida
+    if (typeof converterSiglaParaNome === 'function') {
+        const leiInput = document.getElementById('edit-leiInfrigida');
+        if (leiInput && leiInput.value) {
+            const nomeCompleto = converterSiglaParaNome(leiInput.value);
+            if (nomeCompleto !== leiInput.value) {
+                leiInput.value = nomeCompleto;
             }
         }
-    });
-
-    // Executar verificações em lotes para melhor performance
-    const batchSize = 5;
-    for (let i = 0; i < promises.length; i += batchSize) {
-        const batch = promises.slice(i, i + batchSize);
-        await Promise.all(batch);
-        
-        // Pequeno delay entre lotes para não sobrecarregar
-        if (i + batchSize < promises.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
     }
-}
-
-// Update indicator display
-function updateIndicatorDisplay(indicator, result) {
-    if (result.success && result.attachments && result.attachments.length > 0) {
-        // Há anexos - mostrar clipe
-        indicator.innerHTML = '📎';
-        indicator.title = `${result.attachments.length} anexo(s) PDF`;
-        indicator.className = 'attachment-indicator has-attachments';
-        indicator.style.display = 'inline-flex';
-    } else {
-        // Sem anexos - ocultar completamente
-        indicator.innerHTML = '';
-        indicator.title = '';
-        indicator.className = 'attachment-indicator no-attachments';
-        indicator.style.display = 'none';
-    }
-}
-
-// Update attachment indicator for a specific occurrence
-async function updateAttachmentIndicator(numeroGenesis) {
-    try {
-        // Limpar cache para esta ocorrência para forçar atualização
-        attachmentsCache.delete(numeroGenesis);
+    
+    // Configurar lógica do campo Status baseado na Espécie (igual ao formulário principal)
+    if (editable) {
+        const especieSelect = document.getElementById('edit-especie');
+        const statusSelect = document.getElementById('edit-status');
         
-        const result = await ipcRenderer.invoke('list-pdf-attachments', numeroGenesis);
-        
-        // Atualizar cache
-        attachmentsCache.set(numeroGenesis, result);
-        
-        // Encontrar o índice da ocorrência na tabela
-        const occurrenceIndex = filteredOccurrences.findIndex(occ => 
-            occ.ocorrencia?.numeroGenesis === numeroGenesis
-        );
-        
-        if (occurrenceIndex !== -1) {
-            const indicator = document.getElementById(`attachment-${occurrenceIndex}`);
+        if (especieSelect && statusSelect) {
+            // Função para atualizar opções do Status baseado na Espécie
+            const updateStatusOptions = () => {
+                const especieSelecionada = especieSelect.value;
+                // Usar o valor atual do select ou o valor da ocorrência
+                const currentStatus = statusSelect.value || currentOccurrence.ocorrencia.status || '';
+                
+                // Definir opções válidas para cada espécie
+                const statusOptionsSubstancia = ['SECRIMPO', 'INSTITUTO DE CRIMINALISTICA', 'DOP', 'DESTRUIÇÃO'];
+                const statusOptionsOutros = ['SECRIMPO', 'CEGOC', 'IC'];
+                
+                // Limpar opções atuais
+                statusSelect.innerHTML = '';
+                
+                if (!especieSelecionada) {
+                    statusSelect.innerHTML = '<option value="">Selecione primeiro a espécie...</option>';
+                    statusSelect.disabled = true;
+                    statusSelect.value = '';
+                    return;
+                }
+                
+                // Adicionar opção padrão
+                statusSelect.innerHTML = '<option value="">Selecione...</option>';
+                statusSelect.disabled = false;
+                
+                // Determinar quais opções usar baseado na espécie
+                const validStatusOptions = especieSelecionada === 'SUBSTÂNCIA' 
+                    ? statusOptionsSubstancia 
+                    : statusOptionsOutros;
+                
+                // Verificar se o status atual é válido para a espécie atual
+                const isCurrentStatusValid = validStatusOptions.includes(currentStatus);
+                
+                // Adicionar opções de status
+                validStatusOptions.forEach(option => {
+                    const isSelected = currentStatus === option && isCurrentStatusValid;
+                    statusSelect.innerHTML += `<option value="${option}"${isSelected ? ' selected' : ''}>${option}</option>`;
+                });
+                
+                // Se o status atual não for válido para a espécie, limpar a seleção
+                // Mas manter o valor se for válido
+                if (currentStatus && !isCurrentStatusValid) {
+                    statusSelect.value = '';
+                } else if (currentStatus && isCurrentStatusValid) {
+                    // Garantir que o valor correto esteja selecionado
+                    statusSelect.value = currentStatus;
+                }
+            };
             
-            if (indicator) {
-                updateIndicatorDisplay(indicator, result);
-            }
+            // Atualizar opções quando a espécie mudar
+            especieSelect.addEventListener('change', function() {
+                // Apenas atualizar as opções de status, sem alterar outros campos
+                updateStatusOptions();
+                // Atualizar apenas a espécie no objeto currentOccurrence (não tocar em item, quantidade, descrição)
+                if (currentOccurrence) {
+                    currentOccurrence.itemApreendido.especie = especieSelect.value;
+                }
+            });
+            
+            // Atualizar opções inicialmente
+            updateStatusOptions();
         }
-    } catch (error) {
-        console.error('Erro ao atualizar indicador de anexo:', error);
-    }
-}
-
-// Format file size
-function formatFileSize(bytes) {
-    if (!bytes) return 'Tamanho desconhecido';
-
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
-
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-// Generate attachments list HTML
-function generateAttachmentsList(attachments) {
-    if (!attachments || attachments.length === 0) {
-        return '<p class="no-attachments">Nenhum anexo PDF encontrado.</p>';
-    }
-
-    return attachments.map(attachment => `
-        <div class="attachment-item">
-            <div class="attachment-info">
-                <svg class="attachment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <div class="attachment-details">
-                    <span class="attachment-name">${attachment.fileName}</span>
-                    <span class="attachment-meta">
-                        ${formatFileSize(attachment.size)} • ${formatDateTime(attachment.dateCreated)}
-                    </span>
-                </div>
-            </div>
-            <div class="attachment-actions">
-                <button class="btn-attachment btn-view" onclick="window.open('${attachment.viewUrl || attachment.fileUrl}', '_blank')" title="Visualizar PDF">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                </button>
-                <button class="btn-attachment btn-download" onclick="downloadAttachment('${attachment.downloadUrl || attachment.fileUrl}', '${attachment.fileName}')" title="Baixar PDF">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-15"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                </button>
-                <button class="btn-attachment btn-remove" onclick="confirmRemoveAttachment('${attachment.fileId}', '${attachment.fileName}')" title="Remover PDF">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        <line x1="10" y1="11" x2="10" y2="17"/>
-                        <line x1="14" y1="11" x2="14" y2="17"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Download attachment
-function downloadAttachment(fileUrl, fileName) {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// Confirm remove attachment
-function confirmRemoveAttachment(fileId, fileName) {
-    customAlert.confirm(
-        `Deseja realmente remover o anexo "${fileName}"?<br><br>⚠️ Esta ação não pode ser desfeita.`,
-        () => {
-            removeAttachment(fileId, fileName);
-        },
-        null,
-        'Remover Anexo'
-    );
-}
-
-// Remove attachment
-async function removeAttachment(fileId, fileName) {
-    if (!currentOccurrence || !fileId) return;
-
-    showLoading('Removendo anexo', 'Excluindo arquivo do Google Drive...');
-
-    try {
-        const result = await ipcRenderer.invoke('delete-pdf-attachment', {
-            fileId: fileId,
-            fileName: fileName,
-            numeroGenesis: currentOccurrence.ocorrencia.numeroGenesis
+        
+        // Adicionar conversão para maiúsculas em tempo real nos campos de texto
+        const textFields = [
+            'edit-numeroGenesis',
+            'edit-dataApreensao',
+            'edit-leiInfrigida',
+            'edit-artigo',
+            'edit-numeroPje',
+            'edit-item',
+            'edit-quantidade',
+            'edit-descricao',
+            'edit-nomeProprietario',
+            'edit-numeroDocumento',
+            'edit-nomePolicial',
+            'edit-matricula',
+            'edit-unidadePolicial'
+        ];
+        
+        textFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                // Converter ao digitar
+                field.addEventListener('input', function(e) {
+                    const input = e.target;
+                    const cursorPosition = input.selectionStart;
+                    const originalValue = input.value;
+                    const upperValue = originalValue.toUpperCase();
+                    
+                    if (originalValue !== upperValue) {
+                        input.value = upperValue;
+                        input.setSelectionRange(cursorPosition, cursorPosition);
+                    }
+                });
+                
+                // Converter ao colar
+                field.addEventListener('paste', function(e) {
+                    setTimeout(() => {
+                        const input = e.target;
+                        const cursorPosition = input.selectionStart;
+                        const originalValue = input.value;
+                        const upperValue = originalValue.toUpperCase();
+                        
+                        if (originalValue !== upperValue) {
+                            input.value = upperValue;
+                            input.setSelectionRange(cursorPosition, cursorPosition);
+                        }
+                    }, 0);
+                });
+            }
         });
-
-        hideLoading();
-
-        if (result && result.success) {
-            customAlert.success(`Anexo "${fileName}" removido com sucesso!`);
-
-            // Recarregar anexos no modal
-            const attachmentsList = document.getElementById('attachmentsList');
-            if (attachmentsList && currentOccurrence) {
-                loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
-            }
-
-            // Limpar cache e atualizar indicador na tabela
-            attachmentsCache.delete(currentOccurrence.ocorrencia.numeroGenesis);
-            updateAttachmentIndicator(currentOccurrence.ocorrencia.numeroGenesis);
-        } else {
-            customAlert.error('Erro ao remover anexo: ' + (result?.message || 'Erro desconhecido'));
+        
+        // Converter sigla para nome completo no campo Lei Infringida quando perder o foco
+        const leiInputEdit = document.getElementById('edit-leiInfrigida');
+        if (leiInputEdit && typeof converterSiglaParaNome === 'function') {
+            leiInputEdit.addEventListener('blur', function() {
+                if (leiInputEdit.value) {
+                    const nomeCompleto = converterSiglaParaNome(leiInputEdit.value);
+                    if (nomeCompleto !== leiInputEdit.value) {
+                        leiInputEdit.value = nomeCompleto;
+                    }
+                }
+            });
         }
-    } catch (error) {
-        console.error('Erro ao remover anexo:', error);
-        hideLoading();
-        customAlert.error('Erro ao remover anexo: ' + error.message);
     }
 }
 
-// Close modal - Otimizado para Performance
+// Close modal
 function closeModal() {
-    // Usar requestAnimationFrame para melhor performance
-    requestAnimationFrame(() => {
-        viewModal.classList.remove('active');
-        currentOccurrence = null;
-        isEditMode = false;
-    });
+    viewModal.classList.remove('active');
+    currentOccurrence = null;
+    isEditMode = false;
 }
 
 // Save edit
@@ -747,38 +742,54 @@ async function saveEdit() {
     if (!currentOccurrence) return;
 
     // Guardar o número Genesis original para identificação
-    const numeroGenesisOriginal = currentOccurrence.ocorrencia.numeroGenesis;
-    const numeroGenesisNovo = document.getElementById('edit-numeroGenesis').value;
+    let numeroGenesisOriginal = currentOccurrence.ocorrencia.numeroGenesis || '';
+    // Se o original for 'N/A' ou vazio, tentar usar o valor atual do campo
+    if (!numeroGenesisOriginal || numeroGenesisOriginal === 'N/A' || numeroGenesisOriginal === '') {
+        numeroGenesisOriginal = document.getElementById('edit-numeroGenesis').value.trim() || '';
+    }
+    
+    const numeroGenesisNovo = document.getElementById('edit-numeroGenesis').value.trim();
+
+    // Validar se o Genesis não está vazio
+    if (!numeroGenesisNovo || numeroGenesisNovo === '') {
+        customAlert.error('O campo Nº Genesis é obrigatório e não pode estar vazio.');
+        document.getElementById('edit-numeroGenesis').focus();
+        return;
+    }
+
+    // Função auxiliar para converter strings para maiúsculas
+    function toUpperCase(value) {
+        return typeof value === 'string' ? value.toUpperCase() : value;
+    }
 
     const updatedData = {
         id: currentOccurrence.id,
         numeroGenesisOriginal: numeroGenesisOriginal, // Para identificar a linha no Google Sheets
         ocorrencia: {
-            numeroGenesis: numeroGenesisNovo,
+            numeroGenesis: toUpperCase(numeroGenesisNovo),
             unidade: document.getElementById('edit-unidade').value,
             dataApreensao: brDateToISO(document.getElementById('edit-dataApreensao').value),
-            leiInfrigida: document.getElementById('edit-leiInfrigida').value,
-            artigo: document.getElementById('edit-artigo').value,
-            policialCondutor: document.getElementById('edit-policialCondutor').value
+            leiInfrigida: toUpperCase(document.getElementById('edit-leiInfrigida').value),
+            artigo: toUpperCase(document.getElementById('edit-artigo').value),
+            status: document.getElementById('edit-status').value,
+            numeroPje: toUpperCase(document.getElementById('edit-numeroPje').value || '')
         },
         itemApreendido: {
             especie: document.getElementById('edit-especie').value,
-            item: document.getElementById('edit-item').value,
-            quantidade: document.getElementById('edit-quantidade').value.split(' ')[0],
-            unidadeMedida: currentOccurrence.itemApreendido.unidadeMedida,
-            descricao: document.getElementById('edit-descricao').value
+            item: toUpperCase(document.getElementById('edit-item').value),
+            quantidade: toUpperCase(document.getElementById('edit-quantidade').value),
+            descricao: toUpperCase(document.getElementById('edit-descricao').value || '')
         },
         proprietario: {
-            nome: document.getElementById('edit-nomeProprietario').value,
-            dataNascimento: brDateToISO(document.getElementById('edit-dataNascimento').value),
+            nome: toUpperCase(document.getElementById('edit-nomeProprietario').value),
             tipoDocumento: document.getElementById('edit-tipoDocumento').value,
-            numeroDocumento: document.getElementById('edit-numeroDocumento').value
+            numeroDocumento: toUpperCase(document.getElementById('edit-numeroDocumento').value)
         },
         policial: {
-            nome: document.getElementById('edit-nomePolicial').value,
-            matricula: document.getElementById('edit-matricula').value,
+            nome: toUpperCase(document.getElementById('edit-nomePolicial').value),
+            matricula: toUpperCase(document.getElementById('edit-matricula').value),
             graduacao: document.getElementById('edit-graduacao').value,
-            unidade: document.getElementById('edit-unidadePolicial').value
+            unidade: toUpperCase(document.getElementById('edit-unidadePolicial').value)
         },
         metadata: currentOccurrence.metadata
     };
@@ -796,17 +807,23 @@ async function saveEdit() {
             closeModal();
             loadOccurrences();
         } else {
-            customAlert.error('Erro ao atualizar: ' + result.message);
+            // Se for erro temporário, não reverter a mudança
+            if (result.temporary) {
+                customAlert.warning(result.message || 'Erro temporário ao atualizar. Os dados foram salvos localmente.');
+                // Não fechar o modal e não recarregar, mantendo as alterações visíveis
+            } else {
+                customAlert.error('Erro ao atualizar: ' + result.message);
+            }
         }
     } catch (error) {
         console.error('Erro ao atualizar:', error);
         hideLoading();
-        customAlert.error('Erro ao atualizar ocorrência');
+        customAlert.error('Erro ao atualizar ocorrência: ' + error.message);
     }
 }
 
 // Open delete modal
-window.confirmDelete = function (index) {
+window.confirmDelete = function(index) {
     currentOccurrence = filteredOccurrences[index];
     deleteOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     deleteModal.classList.add('active');
@@ -836,58 +853,27 @@ async function executeDelete() {
 }
 
 // Open print modal
-window.openPrintModal = function (index) {
+window.openPrintModal = function(index) {
     currentOccurrence = filteredOccurrences[index];
     printOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
     printModal.classList.add('active');
 };
 
-// Open attach modal
-window.openAttachModal = function (index) {
-    console.log('Abrindo modal de anexo para índice:', index);
-    currentOccurrence = filteredOccurrences[index];
-    console.log('Ocorrência atual:', currentOccurrence);
-
-    // Limpar estado anterior
-    if (pdfFileInput) pdfFileInput.value = '';
-    if (attachOccurrenceId) attachOccurrenceId.textContent = currentOccurrence.ocorrencia.numeroGenesis;
-    if (selectedFileName) selectedFileName.textContent = 'Nenhum arquivo selecionado';
-    if (btnUploadPDF) btnUploadPDF.disabled = true;
-    
-    // Abrir modal
-    if (attachModal) {
-        attachModal.classList.add('active');
-        console.log('Modal de anexo aberto');
-        
-        // Garantir que o modal permaneça visível
-        setTimeout(() => {
-            if (!attachModal.classList.contains('active')) {
-                console.log('Modal foi fechado inadvertidamente, reabrindo...');
-                attachModal.classList.add('active');
-            }
-        }, 100);
-    } else {
-        console.error('Modal de anexo não encontrado');
-    }
-};
-
 // Close print modal
 function closePrintModal() {
-    requestAnimationFrame(() => {
-        printModal.classList.remove('active');
-    });
+    printModal.classList.remove('active');
 }
 
 // Print Termo de Apreensão
 async function printTermoApreensao() {
     if (!currentOccurrence) return;
-
+    
     printModal.classList.remove('active');
     showLoading('Gerando documento', 'Criando Termo de Apreensão...');
-
+    
     try {
         closePrintModal();
-
+        
         // Gerar e exibir prévia do documento
         const result = await ipcRenderer.invoke('print-termo-apreensao', currentOccurrence);
         hideLoading();
@@ -901,144 +887,109 @@ async function printTermoApreensao() {
     }
 }
 
-// Close attach modal
-function closeAttachModal() {
-    console.log('Fechando modal de anexo...');
-    requestAnimationFrame(() => {
-        if (attachModal) {
-            attachModal.classList.remove('active');
-        }
-        if (pdfFileInput) {
-            pdfFileInput.value = '';
-        }
-        if (selectedFileName) {
-            selectedFileName.textContent = 'Nenhum arquivo selecionado';
-        }
-        if (btnUploadPDF) {
-            btnUploadPDF.disabled = true;
-        }
-        console.log('Modal de anexo fechado');
-    });
-}
-
-// Select PDF file
-function selectPDFFile() {
-    console.log('Abrindo seletor de arquivo...');
-    if (pdfFileInput) {
-        pdfFileInput.click();
-    } else {
-        console.error('Elemento pdfFileInput não encontrado');
+// Export to Excel - Abre modal de filtros
+function exportToExcel() {
+    const exportFilterModal = document.getElementById('exportFilterModal');
+    if (exportFilterModal) {
+        // Limpar filtros anteriores
+        document.getElementById('exportDataInicial').value = '';
+        document.getElementById('exportDataFinal').value = '';
+        
+        // Limpar checkboxes de status
+        document.querySelectorAll('.export-status-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        // Limpar checkboxes de espécie
+        document.querySelectorAll('.export-especie-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        exportFilterModal.classList.add('active');
     }
 }
 
-// Handle PDF file selection
-function handlePDFSelection(event) {
-    console.log('Arquivo selecionado:', event.target.files);
+// Função para aplicar filtros e exportar
+async function performExportWithFilters() {
+    const dataInicial = document.getElementById('exportDataInicial').value;
+    const dataFinal = document.getElementById('exportDataFinal').value;
     
-    // Garantir que o modal permaneça aberto
-    if (attachModal && !attachModal.classList.contains('active')) {
-        console.log('Reabrindo modal de anexo...');
-        attachModal.classList.add('active');
+    // Obter status selecionados (checkboxes)
+    const selectedStatuses = Array.from(document.querySelectorAll('.export-status-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    // Obter espécies selecionadas (checkboxes)
+    const selectedEspecies = Array.from(document.querySelectorAll('.export-especie-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    // Fechar modal
+    const exportFilterModal = document.getElementById('exportFilterModal');
+    if (exportFilterModal) {
+        exportFilterModal.classList.remove('active');
     }
     
-    const file = event.target.files[0];
-    if (file) {
-        console.log('Tipo do arquivo:', file.type);
-        console.log('Tamanho do arquivo:', file.size);
-
-        if (file.type !== 'application/pdf') {
-            customAlert.error('Por favor, selecione apenas arquivos PDF.');
-            pdfFileInput.value = '';
-            selectedFileName.textContent = 'Nenhum arquivo selecionado';
-            btnUploadPDF.disabled = true;
-            return;
-        }
-
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            customAlert.error('O arquivo deve ter no máximo 10MB.');
-            pdfFileInput.value = '';
-            selectedFileName.textContent = 'Nenhum arquivo selecionado';
-            btnUploadPDF.disabled = true;
-            return;
-        }
-
-        selectedFileName.textContent = file.name;
-        btnUploadPDF.disabled = false;
-        console.log('Arquivo válido selecionado:', file.name);
-    } else {
-        console.log('Nenhum arquivo selecionado - usuário cancelou');
-        selectedFileName.textContent = 'Nenhum arquivo selecionado';
-        btnUploadPDF.disabled = true;
+    // Aplicar filtros
+    let filteredData = [...allOccurrences];
+    
+    // Filtro por data
+    if (dataInicial || dataFinal) {
+        filteredData = filteredData.filter(occ => {
+            const dataApreensao = occ.ocorrencia.dataApreensao;
+            if (!dataApreensao) return false;
+            
+            try {
+                // Converter data brasileira (dd/mm/yyyy) para Date
+                const [day, month, year] = dataApreensao.split('/');
+                if (!day || !month || !year) return false;
+                
+                const occDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                occDate.setHours(0, 0, 0, 0);
+                
+                if (dataInicial) {
+                    const initDate = new Date(dataInicial + 'T00:00:00');
+                    if (occDate < initDate) return false;
+                }
+                
+                if (dataFinal) {
+                    const finalDate = new Date(dataFinal + 'T23:59:59');
+                    if (occDate > finalDate) return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Erro ao processar data:', error);
+                return false;
+            }
+        });
     }
-}
-
-// Upload PDF to Google Drive
-async function uploadPDFAttachment() {
-    console.log('Iniciando upload do PDF...');
-    if (!currentOccurrence || !pdfFileInput.files[0]) {
-        console.log('Erro: Ocorrência ou arquivo não encontrado');
+    
+    // Filtro por status (múltiplos)
+    if (selectedStatuses.length > 0) {
+        filteredData = filteredData.filter(occ => {
+            return selectedStatuses.includes(occ.ocorrencia.status);
+        });
+    }
+    
+    // Filtro por espécie (múltiplas)
+    if (selectedEspecies.length > 0) {
+        filteredData = filteredData.filter(occ => {
+            return selectedEspecies.includes(occ.itemApreendido?.especie);
+        });
+    }
+    
+    // Verificar se há dados para exportar
+    if (filteredData.length === 0) {
+        customAlert.error('Nenhuma ocorrência encontrada com os filtros selecionados.');
         return;
     }
-
-    const file = pdfFileInput.files[0];
-    console.log('Arquivo para upload:', file.name, file.size);
-    showLoading('Enviando PDF', 'Fazendo upload para o Google Drive...');
-
+    
+    // Exportar
+    showLoading('Exportando dados', `Gerando arquivo Excel com ${filteredData.length} ocorrência(s)...`);
     try {
-        // Converter arquivo para ArrayBuffer para enviar via IPC
-        const arrayBuffer = await file.arrayBuffer();
-        const fileData = {
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            data: Array.from(new Uint8Array(arrayBuffer))
-        };
-
-        console.log('Enviando arquivo via IPC...');
-        const result = await ipcRenderer.invoke('upload-pdf-attachment', {
-            fileData: fileData,
-            occurrence: currentOccurrence,
-            fileName: file.name
-        });
-
-        hideLoading();
-        console.log('Resposta do backend:', result);
-
-        if (result && result.success) {
-            // Fechar modal imediatamente
-            closeAttachModal();
-            
-            // Mostrar mensagem de sucesso
-            customAlert.success('PDF anexado com sucesso!<br><br><strong>Arquivo:</strong> ' + result.fileName);
-
-            // Recarregar anexos no modal se estiver aberto
-            const attachmentsList = document.getElementById('attachmentsList');
-            if (attachmentsList && currentOccurrence) {
-                loadAttachments(currentOccurrence.ocorrencia.numeroGenesis);
-            }
-
-            // Limpar cache e atualizar indicador na tabela
-            attachmentsCache.delete(currentOccurrence.ocorrencia.numeroGenesis);
-            updateAttachmentIndicator(currentOccurrence.ocorrencia.numeroGenesis);
-        } else {
-            console.error('Erro no resultado:', result);
-            customAlert.error('Erro ao anexar PDF: ' + (result?.message || 'Erro desconhecido'));
-        }
-    } catch (error) {
-        console.error('Erro ao fazer upload do PDF:', error);
-        hideLoading();
-        customAlert.error('Erro ao anexar PDF: ' + error.message);
-    }
-}
-
-// Export to Excel
-async function exportToExcel() {
-    showLoading('Exportando dados', 'Gerando arquivo Excel...');
-    try {
-        const result = await ipcRenderer.invoke('export-occurrences');
+        const result = await ipcRenderer.invoke('export-occurrences', filteredData);
         hideLoading();
         if (result.success) {
-            customAlert.success('Arquivo Excel exportado com sucesso!<br><br><strong>Local:</strong> ' + result.filePath);
+            customAlert.success(`Arquivo Excel exportado com sucesso!<br><br><strong>Ocorrências exportadas:</strong> ${filteredData.length}<br><strong>Local:</strong> ${result.filePath}`);
         } else {
             customAlert.error('Erro ao exportar: ' + result.message);
         }
@@ -1049,52 +1000,222 @@ async function exportToExcel() {
     }
 }
 
-// Search com debounce para melhor performance
-let searchTimeout;
-searchInput.addEventListener('input', (e) => {
-    // Limpar timeout anterior
-    clearTimeout(searchTimeout);
+// ==================== FUNCIONALIDADE DE FILTROS ====================
 
-    // Debounce de 300ms para evitar muitas renderizações
-    searchTimeout = setTimeout(() => {
-        const query = e.target.value.toLowerCase().trim();
-
-        if (!query) {
-            filteredOccurrences = [...allOccurrences];
-        } else {
-            filteredOccurrences = allOccurrences.filter(occ => {
-                try {
-                    // Tentar diferentes possíveis estruturas de dados
-                    let numeroGenesis = '';
-
-                    if (occ.ocorrencia?.numeroGenesis) {
-                        numeroGenesis = occ.ocorrencia.numeroGenesis;
-                    }
-                    else if (occ.numeroGenesis) {
-                        numeroGenesis = occ.numeroGenesis;
-                    }
-                    else if (occ['Nº Genesis']) {
-                        numeroGenesis = occ['Nº Genesis'];
-                    }
-                    else if (occ['numeroGenesis']) {
-                        numeroGenesis = occ['numeroGenesis'];
-                    }
-                    else if (occ['numero_genesis']) {
-                        numeroGenesis = occ['numero_genesis'];
-                    }
-
-                    const numeroGenesisLower = (numeroGenesis || '').toString().toLowerCase();
-                    return numeroGenesisLower.includes(query);
-                } catch (error) {
-                    console.error('Erro ao filtrar ocorrência:', error, occ);
-                    return false;
-                }
-            });
+// Abrir modal de filtros de ocorrências
+if (filterBtn) {
+    filterBtn.addEventListener('click', () => {
+        populateStatusOptions();
+        restoreFilterValues();
+        if (filterModal) {
+            filterModal.classList.add('active');
         }
+    });
+}
 
+// Fechar modal de filtros
+if (filterModalClose) {
+    filterModalClose.addEventListener('click', () => {
+        if (filterModal) filterModal.classList.remove('active');
+    });
+}
+
+// Preencher opções de status e unidade dinamicamente
+function populateStatusOptions() {
+    const statusSelect = document.getElementById('filterStatus');
+    const unidadeSelect = document.getElementById('filterUnidade');
+    
+    // Preencher Status
+    if (statusSelect) {
+        // Obter todos os status únicos das ocorrências
+        const allStatus = [...new Set(allOccurrences.map(occ => occ.ocorrencia?.status).filter(Boolean))];
+        
+        // Limpar opções existentes (exceto "Todos os status")
+        statusSelect.innerHTML = '<option value="">Todos os status</option>';
+        
+        // Adicionar opções
+        allStatus.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            statusSelect.appendChild(option);
+        });
+    }
+    
+    // Preencher Unidade
+    if (unidadeSelect) {
+        // Obter todas as unidades únicas das ocorrências
+        const allUnidades = [...new Set(allOccurrences.map(occ => occ.ocorrencia?.unidade).filter(Boolean))];
+        
+        // Limpar opções existentes (exceto "Todas as unidades")
+        unidadeSelect.innerHTML = '<option value="">Todas as unidades</option>';
+        
+        // Adicionar opções
+        allUnidades.forEach(unidade => {
+            const option = document.createElement('option');
+            option.value = unidade;
+            option.textContent = unidade;
+            unidadeSelect.appendChild(option);
+        });
+    }
+}
+
+// Restaurar valores dos filtros
+function restoreFilterValues() {
+    const filterNumeroGenesis = document.getElementById('filterNumeroGenesis');
+    const filterDataInicial = document.getElementById('filterDataInicial');
+    const filterDataFinal = document.getElementById('filterDataFinal');
+    const filterUnidade = document.getElementById('filterUnidade');
+    const filterStatus = document.getElementById('filterStatus');
+    
+    if (filterNumeroGenesis) filterNumeroGenesis.value = activeFilters.numeroGenesis || '';
+    if (filterDataInicial) filterDataInicial.value = activeFilters.dataInicial || '';
+    if (filterDataFinal) filterDataFinal.value = activeFilters.dataFinal || '';
+    if (filterUnidade) filterUnidade.value = activeFilters.unidade || '';
+    if (filterStatus) filterStatus.value = activeFilters.status || '';
+}
+
+// Aplicar filtros de ocorrências
+if (btnApplyFilters) {
+    btnApplyFilters.addEventListener('click', () => {
+        applyOccurrenceFilters();
+        if (filterModal) filterModal.classList.remove('active');
+    });
+}
+
+// Limpar filtros de ocorrências
+if (btnClearFilters) {
+    btnClearFilters.addEventListener('click', () => {
+        clearOccurrenceFilters();
+    });
+}
+
+// Função para verificar se há filtros ativos em ocorrências
+function hasActiveOccurrenceFilters() {
+    return !!(activeFilters.numeroGenesis || activeFilters.dataInicial || activeFilters.dataFinal || 
+              activeFilters.unidade || activeFilters.status);
+}
+
+// Função para atualizar estado visual do botão de filtro de ocorrências
+function updateOccurrenceFilterButtonState() {
+    if (filterBtn) {
+        if (hasActiveOccurrenceFilters()) {
+            filterBtn.classList.add('active');
+        } else {
+            filterBtn.classList.remove('active');
+        }
+    }
+}
+
+function applyOccurrenceFilters() {
+    const filterNumeroGenesis = document.getElementById('filterNumeroGenesis');
+    const filterDataInicial = document.getElementById('filterDataInicial');
+    const filterDataFinal = document.getElementById('filterDataFinal');
+    const filterUnidade = document.getElementById('filterUnidade');
+    const filterStatus = document.getElementById('filterStatus');
+    
+    // Salvar filtros ativos
+    activeFilters = {
+        numeroGenesis: filterNumeroGenesis ? filterNumeroGenesis.value.trim() : '',
+        dataInicial: filterDataInicial ? filterDataInicial.value : '',
+        dataFinal: filterDataFinal ? filterDataFinal.value : '',
+        unidade: filterUnidade ? filterUnidade.value : '',
+        status: filterStatus ? filterStatus.value : ''
+    };
+    
+    // Aplicar filtros
+    filteredOccurrences = allOccurrences.filter(occ => {
+        // Filtro por Nº Genesis
+        if (activeFilters.numeroGenesis) {
+            const numeroGenesis = (occ.ocorrencia?.numeroGenesis || '').toString().toLowerCase();
+            if (!numeroGenesis.includes(activeFilters.numeroGenesis.toLowerCase())) {
+                return false;
+            }
+        }
+        
+        // Filtro por Data
+        if (activeFilters.dataInicial || activeFilters.dataFinal) {
+            const occDate = occ.ocorrencia?.dataApreensao ? new Date(occ.ocorrencia.dataApreensao) : null;
+            if (occDate) {
+                if (activeFilters.dataInicial) {
+                    const dataInicial = new Date(activeFilters.dataInicial);
+                    dataInicial.setHours(0, 0, 0, 0);
+                    if (occDate < dataInicial) {
+                        return false;
+                    }
+                }
+                if (activeFilters.dataFinal) {
+                    const dataFinal = new Date(activeFilters.dataFinal);
+                    dataFinal.setHours(23, 59, 59, 999);
+                    if (occDate > dataFinal) {
+                        return false;
+                    }
+                }
+            } else if (activeFilters.dataInicial || activeFilters.dataFinal) {
+                return false;
+            }
+        }
+        
+        // Filtro por Unidade
+        if (activeFilters.unidade && occ.ocorrencia?.unidade !== activeFilters.unidade) {
+            return false;
+        }
+        
+        // Filtro por Status
+        if (activeFilters.status && occ.ocorrencia?.status !== activeFilters.status) {
+            return false;
+        }
+        
+        return true;
+    });
+    
+    // Atualizar estado visual do botão
+    updateOccurrenceFilterButtonState();
+    
+    renderTable();
+}
+
+function clearOccurrenceFilters() {
+    activeFilters = {
+        numeroGenesis: '',
+        dataInicial: '',
+        dataFinal: '',
+        unidade: '',
+        status: ''
+    };
+    
+    const filterNumeroGenesis = document.getElementById('filterNumeroGenesis');
+    const filterDataInicial = document.getElementById('filterDataInicial');
+    const filterDataFinal = document.getElementById('filterDataFinal');
+    const filterUnidade = document.getElementById('filterUnidade');
+    const filterStatus = document.getElementById('filterStatus');
+    
+    if (filterNumeroGenesis) filterNumeroGenesis.value = '';
+    if (filterDataInicial) filterDataInicial.value = '';
+    if (filterDataFinal) filterDataFinal.value = '';
+    if (filterUnidade) filterUnidade.value = '';
+    if (filterStatus) filterStatus.value = '';
+    
+    filteredOccurrences = [...allOccurrences];
+    
+    // Atualizar estado visual do botão
+    updateOccurrenceFilterButtonState();
+    
+    renderTable();
+}
+
+// Aplicar filtros quando carregar ocorrências
+function applyOccurrenceFiltersOnLoad() {
+    if (activeFilters.numeroGenesis || activeFilters.dataInicial || activeFilters.dataFinal || 
+        activeFilters.unidade || activeFilters.status) {
+        applyOccurrenceFilters();
+    } else {
+        filteredOccurrences = [...allOccurrences];
+        // Atualizar estado visual do botão (sem filtros ativos)
+        updateOccurrenceFilterButtonState();
         renderTable();
-    }, 300);
-});
+    }
+}
 
 // Tab navigation
 tabDashboard.addEventListener('click', () => {
@@ -1105,6 +1226,10 @@ tabOcorrencias.addEventListener('click', () => {
     setActiveTab('ocorrencias');
 });
 
+tabTCO.addEventListener('click', () => {
+    setActiveTab('tco');
+});
+
 tabNovaOcorrencia.addEventListener('click', () => {
     ipcRenderer.send('load-panel');
 });
@@ -1112,17 +1237,23 @@ tabNovaOcorrencia.addEventListener('click', () => {
 function setActiveTab(tab) {
     // Remove active from all tabs
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-
+    
     // Hide all sections
     sectionDashboard.style.display = 'none';
     sectionOcorrencias.style.display = 'none';
-
+    sectionTCO.style.display = 'none';
+    
     if (tab === 'dashboard') {
         tabDashboard.classList.add('active');
         sectionDashboard.style.display = 'block';
     } else if (tab === 'ocorrencias') {
         tabOcorrencias.classList.add('active');
         sectionOcorrencias.style.display = 'block';
+        // Atualizar estado do botão de filtro quando a aba for ativada
+        updateOccurrenceFilterButtonState();
+    } else if (tab === 'tco') {
+        tabTCO.classList.add('active');
+        sectionTCO.style.display = 'block';
     }
 }
 
@@ -1133,16 +1264,196 @@ userMenuBtn.addEventListener('click', (e) => {
 });
 
 document.addEventListener('click', (e) => {
-    // Fechar dropdown do usuário se clicar fora
     if (!userDropdown.contains(e.target) && !userMenuBtn.contains(e.target)) {
         userDropdown.classList.remove('active');
     }
-    
-    // Não interferir com modais ou file inputs
-    if (e.target.type === 'file' || e.target.closest('.modal') || e.target.closest('.upload-zone')) {
-        return;
+});
+
+// Verificar atualizações manualmente
+if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener('click', async () => {
+        showLoading('Verificando atualizações', 'Buscando novas versões...');
+        try {
+            const result = await ipcRenderer.invoke('check-updates-manual');
+            hideLoading();
+            
+            if (result && result.error) {
+                customAlert.error('Erro ao verificar atualizações: ' + result.error);
+            } else if (result && result.available) {
+                currentUpdateInfo = result;
+                showUpdateModal(result);
+            } else if (result && !result.available) {
+                customAlert.success('Você está usando a versão mais recente do aplicativo!');
+            } else {
+                customAlert.info('Não foi possível verificar atualizações no momento. Tente novamente mais tarde.');
+            }
+        } catch (error) {
+            console.error('Erro ao verificar atualizações:', error);
+            hideLoading();
+            customAlert.error('Erro ao verificar atualizações: ' + error.message);
+        }
+    });
+}
+
+// Modal de atualização
+let currentUpdateInfo = null;
+
+if (updateModalClose) {
+    updateModalClose.addEventListener('click', () => {
+        if (updateModal) updateModal.classList.remove('active');
+    });
+}
+
+if (btnUpdateLater) {
+    btnUpdateLater.addEventListener('click', () => {
+        if (updateModal) updateModal.classList.remove('active');
+    });
+}
+
+// Elementos de progresso
+const updateProgressContainer = document.getElementById('updateProgressContainer');
+const updateProgressBar = document.getElementById('updateProgressBar');
+const updateProgressText = document.getElementById('updateProgressText');
+
+if (btnDownloadUpdate) {
+    btnDownloadUpdate.addEventListener('click', async () => {
+        if (!currentUpdateInfo) {
+            customAlert.error('Informações de atualização não disponíveis.');
+            return;
+        }
+
+        // Verificar se tem instalador disponível
+        if (!currentUpdateInfo.installerUrl || !currentUpdateInfo.installerName) {
+            // Fallback: abrir página de releases
+            if (currentUpdateInfo.downloadUrl) {
+                try {
+                    const result = await ipcRenderer.invoke('open-external-url', currentUpdateInfo.downloadUrl);
+                    if (result.success) {
+                        if (updateModal) updateModal.classList.remove('active');
+                        customAlert.info('O link de download foi aberto no seu navegador. Após baixar, instale a nova versão para atualizar o aplicativo.');
+                    } else {
+                        customAlert.error('Erro ao abrir link de download: ' + (result.error || 'Erro desconhecido'));
+                    }
+                } catch (error) {
+                    console.error('Erro ao abrir link de download:', error);
+                    customAlert.error('Erro ao abrir link de download.');
+                }
+            } else {
+                customAlert.error('Arquivo de instalação não disponível. Por favor, baixe manualmente.');
+            }
+            return;
+        }
+
+        // Desabilitar botões durante download
+        btnDownloadUpdate.disabled = true;
+        btnUpdateLater.disabled = true;
+        btnDownloadUpdate.textContent = 'Baixando...';
+
+        // Mostrar progresso
+        if (updateProgressContainer) {
+            updateProgressContainer.style.display = 'block';
+        }
+        if (updateProgressBar) {
+            updateProgressBar.style.width = '0%';
+        }
+        if (updateProgressText) {
+            updateProgressText.textContent = 'Iniciando download...';
+        }
+
+        try {
+            // Baixar e instalar automaticamente
+            const result = await ipcRenderer.invoke('download-and-install-update', currentUpdateInfo);
+            
+            if (result.success) {
+                if (updateProgressText) {
+                    updateProgressText.textContent = 'Instalação iniciada. A aplicação será fechada em instantes...';
+                }
+                // A aplicação será fechada automaticamente pelo main process
+            } else {
+                // Reabilitar botões em caso de erro
+                btnDownloadUpdate.disabled = false;
+                btnUpdateLater.disabled = false;
+                btnDownloadUpdate.textContent = 'Baixar Atualização';
+                
+                if (updateProgressContainer) {
+                    updateProgressContainer.style.display = 'none';
+                }
+                
+                customAlert.error('Erro ao baixar/instalar atualização: ' + (result.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Erro ao baixar/instalar atualização:', error);
+            
+            // Reabilitar botões em caso de erro
+            btnDownloadUpdate.disabled = false;
+            btnUpdateLater.disabled = false;
+            btnDownloadUpdate.textContent = 'Baixar Atualização';
+            
+            if (updateProgressContainer) {
+                updateProgressContainer.style.display = 'none';
+            }
+            
+            customAlert.error('Erro ao baixar/instalar atualização: ' + error.message);
+        }
+    });
+}
+
+// Listener para receber progresso do download
+ipcRenderer.on('update-download-progress', (event, progress) => {
+    if (updateProgressBar && progress.percent !== undefined) {
+        updateProgressBar.style.width = progress.percent + '%';
+    }
+    if (updateProgressText && progress.message) {
+        updateProgressText.textContent = progress.message;
     }
 });
+
+// Listener para receber notificação de atualização do main process
+ipcRenderer.on('update-available', (event, updateInfo) => {
+    if (updateInfo && updateInfo.available) {
+        currentUpdateInfo = updateInfo;
+        showUpdateModal(updateInfo);
+    }
+});
+
+// Função para mostrar modal de atualização
+function showUpdateModal(updateInfo) {
+    if (currentVersionDisplay) {
+        currentVersionDisplay.textContent = updateInfo.currentVersion || 'Desconhecida';
+    }
+    if (latestVersionDisplay) {
+        latestVersionDisplay.textContent = updateInfo.latestVersion || 'Desconhecida';
+    }
+    if (releaseNotesContent) {
+        releaseNotesContent.textContent = updateInfo.releaseNotes || 'Sem notas de versão disponíveis.';
+    }
+    
+    // Esconder progresso ao mostrar modal
+    if (updateProgressContainer) {
+        updateProgressContainer.style.display = 'none';
+    }
+    if (updateProgressBar) {
+        updateProgressBar.style.width = '0%';
+    }
+    
+    // Reabilitar botões
+    if (btnDownloadUpdate) {
+        btnDownloadUpdate.disabled = false;
+        const svgIcon = btnDownloadUpdate.querySelector('svg');
+        if (svgIcon) {
+            btnDownloadUpdate.innerHTML = svgIcon.outerHTML + ' Baixar e Instalar';
+        } else {
+            btnDownloadUpdate.textContent = 'Baixar e Instalar';
+        }
+    }
+    if (btnUpdateLater) {
+        btnUpdateLater.disabled = false;
+    }
+    
+    if (updateModal) {
+        updateModal.classList.add('active');
+    }
+}
 
 // Logout
 logoutBtn.addEventListener('click', () => {
@@ -1154,6 +1465,93 @@ logoutBtn.addEventListener('click', () => {
         }
     );
 });
+
+// ==================== FUNCIONALIDADE DE SUPORTE ====================
+
+// Elementos do modal de suporte
+const suporteBtn = document.getElementById('suporteBtn');
+const suporteModal = document.getElementById('suporteModal');
+const suporteModalClose = document.getElementById('suporteModalClose');
+const suporteCancelBtn = document.getElementById('suporteCancelBtn');
+const suporteSubmitBtn = document.getElementById('suporteSubmitBtn');
+const suporteForm = document.getElementById('suporteForm');
+
+// Abrir modal de suporte
+if (suporteBtn) {
+    suporteBtn.addEventListener('click', () => {
+        // Preencher nome automaticamente se disponível
+        const username = sessionStorage.getItem('username');
+        if (username && document.getElementById('suporteNome')) {
+            document.getElementById('suporteNome').value = username;
+        }
+        suporteModal.classList.add('active');
+        userDropdown.classList.remove('active'); // Fechar dropdown
+    });
+}
+
+// Fechar modal de suporte
+if (suporteModalClose) {
+    suporteModalClose.addEventListener('click', () => {
+        suporteModal.classList.remove('active');
+        suporteForm.reset();
+    });
+}
+
+if (suporteCancelBtn) {
+    suporteCancelBtn.addEventListener('click', () => {
+        suporteModal.classList.remove('active');
+        suporteForm.reset();
+    });
+}
+
+// Não fechar modal ao clicar fora (modal contém formulário)
+// O modal só fecha através dos botões de fechar/cancelar
+
+// Enviar formulário de suporte
+if (suporteSubmitBtn) {
+    suporteSubmitBtn.addEventListener('click', async () => {
+        if (!suporteForm.checkValidity()) {
+            suporteForm.reportValidity();
+            return;
+        }
+
+        const formData = {
+            nome: document.getElementById('suporteNome').value.trim(),
+            unidade: document.getElementById('suporteUnidade').value,
+            problema: document.getElementById('suporteProblema').value.trim(),
+            prioridade: document.getElementById('suportePrioridade').value,
+            descricao: document.getElementById('suporteDescricao').value.trim()
+        };
+
+        // Validar campos
+        if (!formData.nome || !formData.unidade || !formData.problema || !formData.prioridade || !formData.descricao) {
+            customAlert.error('Por favor, preencha todos os campos obrigatórios.');
+            return;
+        }
+
+        // Desabilitar botão durante envio
+        suporteSubmitBtn.disabled = true;
+        suporteSubmitBtn.textContent = 'Enviando...';
+
+        try {
+            const result = await ipcRenderer.invoke('send-support-request', formData);
+            
+            if (result.success) {
+                customAlert.success('Solicitação de suporte enviada com sucesso!');
+                suporteModal.classList.remove('active');
+                suporteForm.reset();
+            } else {
+                customAlert.error('Erro ao enviar solicitação: ' + (result.message || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Erro ao enviar suporte:', error);
+            customAlert.error('Erro ao enviar solicitação de suporte: ' + error.message);
+        } finally {
+            suporteSubmitBtn.disabled = false;
+            suporteSubmitBtn.textContent = 'Enviar';
+        }
+    });
+}
 
 // Modal events
 modalClose.addEventListener('click', closeModal);
@@ -1169,53 +1567,65 @@ btnCancelDelete.addEventListener('click', () => {
 });
 btnConfirmDelete.addEventListener('click', executeDelete);
 
-// Attach modal events
-if (attachModalClose) attachModalClose.addEventListener('click', closeAttachModal);
-if (btnCancelAttach) btnCancelAttach.addEventListener('click', closeAttachModal);
-// Event listener para seleção de arquivo PDF
-if (pdfFileInput) {
-    pdfFileInput.addEventListener('change', handlePDFSelection);
-    
-    // Prevenir que o modal feche quando o file dialog for cancelado
-    pdfFileInput.addEventListener('cancel', (e) => {
-        console.log('Seleção de arquivo cancelada');
-        e.preventDefault();
-        e.stopPropagation();
-    });
-}
-
-if (btnUploadPDF) btnUploadPDF.addEventListener('click', uploadPDFAttachment);
-
-// Adicionar event listener na zona de upload
-const uploadZone = document.querySelector('.upload-zone');
-if (uploadZone) {
-    uploadZone.addEventListener('click', function () {
-        console.log('Zona de upload clicada');
-        if (pdfFileInput) {
-            pdfFileInput.click();
-        }
-    });
-}
-
-// Debug: verificar se os elementos existem
-console.log('Elementos do modal de anexo:');
-console.log('attachModal:', !!attachModal);
-console.log('attachModalClose:', !!attachModalClose);
-console.log('btnCancelAttach:', !!btnCancelAttach);
-console.log('uploadZone:', !!uploadZone);
-console.log('pdfFileInput:', !!pdfFileInput);
-console.log('btnUploadPDF:', !!btnUploadPDF);
-console.log('selectedFileName:', !!selectedFileName);
-
 printModalClose.addEventListener('click', closePrintModal);
 btnCancelPrint.addEventListener('click', closePrintModal);
 btnPrintTermoApreensao.addEventListener('click', printTermoApreensao);
+
+// Modal de filtros de exportação
+if (exportFilterModalClose) {
+    exportFilterModalClose.addEventListener('click', () => {
+        exportFilterModal.classList.remove('active');
+    });
+}
+if (btnCancelExportFilter) {
+    btnCancelExportFilter.addEventListener('click', () => {
+        exportFilterModal.classList.remove('active');
+    });
+}
+if (btnConfirmExportFilter) {
+    btnConfirmExportFilter.addEventListener('click', performExportWithFilters);
+}
+
+// Modal de filtros de exportação de TCOs
+if (exportTCOFilterModalClose) {
+    exportTCOFilterModalClose.addEventListener('click', () => {
+        exportTCOFilterModal.classList.remove('active');
+    });
+}
+if (btnCancelExportTCOFilter) {
+    btnCancelExportTCOFilter.addEventListener('click', () => {
+        exportTCOFilterModal.classList.remove('active');
+    });
+}
+if (btnConfirmExportTCOFilter) {
+    btnConfirmExportTCOFilter.addEventListener('click', performExportTCOsWithFilters);
+}
+
+// Adicionar event listeners para checkboxes para atualizar visual
+document.addEventListener('DOMContentLoaded', () => {
+    // Atualizar visual dos checkboxes quando mudarem
+    const updateCheckboxVisual = (checkbox) => {
+        const option = checkbox.closest('.checkbox-option');
+        if (checkbox.checked) {
+            option.classList.add('checked');
+        } else {
+            option.classList.remove('checked');
+        }
+    };
+    
+    // Adicionar listeners para todos os checkboxes
+    document.querySelectorAll('.export-status-checkbox, .export-especie-checkbox, .export-ilicito-checkbox, .export-tco-status-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', () => updateCheckboxVisual(checkbox));
+        // Inicializar estado visual
+        updateCheckboxVisual(checkbox);
+    });
+});
 
 // Refresh button
 refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
     refreshBtn.disabled = true;
-
+    
     try {
         await loadOccurrences();
         // Pequeno delay para mostrar a animação
@@ -1238,12 +1648,8 @@ btnNovaOcorrenciaEmpty.addEventListener('click', () => {
     ipcRenderer.send('load-panel');
 });
 
-// Close modal on outside click
-viewModal.addEventListener('click', (e) => {
-    if (e.target === viewModal) {
-        closeModal();
-    }
-});
+// Não fechar modal ao clicar fora (modal contém formulário para edição)
+// O modal só fecha através dos botões de fechar/cancelar
 
 deleteModal.addEventListener('click', (e) => {
     if (e.target === deleteModal) {
@@ -1254,13 +1660,6 @@ deleteModal.addEventListener('click', (e) => {
 printModal.addEventListener('click', (e) => {
     if (e.target === printModal) {
         closePrintModal();
-    }
-});
-
-// Close attach modal on outside click (but not when file dialog is open)
-attachModal.addEventListener('click', (e) => {
-    if (e.target === attachModal) {
-        closeAttachModal();
     }
 });
 
@@ -1298,1019 +1697,575 @@ function hideEmptyState() {
     emptyState.style.display = 'none';
 }
 
-// Update charts
-function updateCharts() {
-    // Ocorrências Gerais
-    createLineChart();
-    createPieChartMonth();
-    createBarChartDay();
+// ==================== FUNCIONALIDADE TCO ====================
 
-    // Unidade
-    createPieChartUnidadePeriodo();
-    createPieChartUnidadeMes();
-    createBarChartUnidadeDia();
+// Elementos TCO
+const refreshBtnTCO = document.getElementById('refreshBtnTCO');
+const exportBtnTCO = document.getElementById('exportBtnTCO');
+const tcoTableBody = document.getElementById('tcoTableBody');
 
-    // Itens
-    createPieChartItensPeriodo();
-    createPieChartItensMes();
-    createBarChartItensDia();
+let tcoData = []; // Array para armazenar dados dos TCOs
+
+// Função para carregar TCOs do Google Sheets
+async function loadTCOs() {
+    try {
+        const response = await ipcRenderer.invoke('get-tcos');
+        
+        if (response.success && response.tcos) {
+            tcoData = response.tcos;
+            console.log('TCOs carregados:', tcoData.length);
+        } else {
+            console.error('Erro ao carregar TCOs:', response);
+            tcoData = [];
+        }
+        
+        // Atualizar estado visual do botão após carregar
+        updateTCOFilterButtonState();
+        
+        renderTCOTable();
+        
+    } catch (error) {
+        console.error('Erro ao carregar TCOs:', error);
+        tcoData = [];
+        // Atualizar estado visual do botão mesmo em caso de erro
+        updateTCOFilterButtonState();
+        renderTCOTable();
+    }
 }
 
-// Create pie chart - Occurrences over custom date range or last 30 days
-function createLineChart() {
-    const ctx = document.getElementById('lineChart');
-    if (!ctx) return;
+// Aplicar filtros quando carregar TCOs
+function loadTCOsWithFilters() {
+    loadTCOs().then(() => {
+        // Aplicar filtros ativos após carregar
+        renderTCOTable();
+        // Atualizar estado visual do botão
+        updateTCOFilterButtonState();
+    });
+}
 
-    // Destroy existing chart
-    if (lineChart) {
-        lineChart.destroy();
-    }
-
-    // Determine date range
-    let startDate, endDate;
-    if (customDateRange) {
-        startDate = customDateRange.startDate;
-        endDate = customDateRange.endDate;
-    } else {
-        // Default: last 30 days
-        endDate = new Date();
-        startDate = new Date();
-        startDate.setDate(startDate.getDate() - 29);
-    }
-
-    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-    let labels = [];
-    let counts = [];
-
-    // Se período maior que 60 dias, agrupar por mês
-    if (daysDiff > 60) {
-        const monthCounts = {};
-
-        // Filtrar ocorrências no período
-        const filteredOccs = allOccurrences.filter(occ => {
-            if (!occ.metadata?.dataRegistro) return false;
-            const occDate = new Date(occ.metadata.dataRegistro);
-            return occDate >= startDate && occDate <= endDate;
+// Função para renderizar tabela de TCOs (com filtros)
+function renderTCOTable() {
+    tcoTableBody.innerHTML = '';
+    
+    let filteredData = [...tcoData];
+    
+    // Aplicar filtros
+    if (activeFiltersTCO.rap) {
+        filteredData = filteredData.filter(tco => {
+            const rap = (tco.rap || '').toString().toLowerCase();
+            return rap.includes(activeFiltersTCO.rap.toLowerCase());
         });
-
-        // Contar por mês
-        filteredOccs.forEach(occ => {
-            const occDate = new Date(occ.metadata.dataRegistro);
-            const monthKey = `${monthNames[occDate.getMonth()]}/${occDate.getFullYear()}`;
-            monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
-        });
-
-        // Ordenar por data
-        const sortedMonths = Object.entries(monthCounts).sort((a, b) => {
-            const [monthA, yearA] = a[0].split('/');
-            const [monthB, yearB] = b[0].split('/');
-            const dateA = new Date(yearA, monthNames.indexOf(monthA));
-            const dateB = new Date(yearB, monthNames.indexOf(monthB));
-            return dateA - dateB;
-        });
-
-        labels = sortedMonths.map(([month]) => month);
-        counts = sortedMonths.map(([, count]) => count);
-    } else {
-        // Período curto: agrupar por dia
-        for (let i = 0; i <= daysDiff; i++) {
-            const date = new Date(startDate);
-            date.setDate(date.getDate() + i);
-            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            labels.push(dateStr);
-
-            const count = allOccurrences.filter(occ => {
-                if (!occ.metadata?.dataRegistro) return false;
-                const occDate = new Date(occ.metadata.dataRegistro);
-                return occDate.toDateString() === date.toDateString();
-            }).length;
-            counts.push(count);
-        }
     }
+    
+    if (activeFiltersTCO.ilicito) {
+        filteredData = filteredData.filter(tco => tco.ilicito === activeFiltersTCO.ilicito);
+    }
+    
+    if (activeFiltersTCO.item) {
+        filteredData = filteredData.filter(tco => {
+            const item = (tco.item || '').toString().toLowerCase();
+            return item.includes(activeFiltersTCO.item.toLowerCase());
+        });
+    }
+    
+    // Se não houver dados, mostra mensagem na tabela
+    if (filteredData.length === 0) {
+        tcoTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #999;">Nenhum TCO encontrado</td></tr>';
+        return;
+    }
+    
+    filteredData.forEach(tco => {
+        const row = document.createElement('tr');
+        // Garantir que o RAP (Genesis) seja exibido corretamente
+        const rapValue = (tco.rap || '').toString().trim();
+        row.innerHTML = `
+            <td><strong>${rapValue || 'N/A'}</strong></td>
+            <td>${tco.envolvido || 'N/A'}</td>
+            <td>${tco.ilicito || 'N/A'}</td>
+            <td>${tco.item || 'N/A'}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn-action btn-view" onclick="viewTCO('${tco.id}')" title="Ver detalhes">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                    <button class="btn-action btn-edit" onclick="editTCO('${tco.id}')" title="Editar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="btn-action btn-print" onclick="printTCO('${tco.id}')" title="Imprimir">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 6 2 18 2 18 9"/>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                            <rect x="6" y="14" width="12" height="8"/>
+                        </svg>
+                    </button>
+                    <button class="btn-action btn-delete-action" onclick="deleteTCO('${tco.id}')" title="Excluir">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+        `;
+        tcoTableBody.appendChild(row);
+    });
+}
 
-    const colors = ['#279b4d', '#071d49', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-
-    lineChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: counts,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
+// Filtros TCO
+if (filterBtnTCO) {
+    filterBtnTCO.addEventListener('click', () => {
+        populateIlicitoOptions();
+        restoreTCOFilterValues();
+        if (filterModalTCO) {
+            filterModalTCO.classList.add('active');
         }
     });
 }
 
-// Create bar chart - Occurrences by day (last 7 days)
-function createBarChartDay() {
-    const ctx = document.getElementById('barChartDay');
-    if (!ctx) return;
+if (filterModalTCOClose) {
+    filterModalTCOClose.addEventListener('click', () => {
+        if (filterModalTCO) filterModalTCO.classList.remove('active');
+    });
+}
 
-    // Destroy existing chart
-    if (barChartDay) {
-        barChartDay.destroy();
+// Preencher opções de ilícito dinamicamente
+function populateIlicitoOptions() {
+    const ilicitoSelect = document.getElementById('filterIlicito');
+    if (!ilicitoSelect) return;
+    
+    // Obter todos os ilícitos únicos dos TCOs
+    const allIlicitos = [...new Set(tcoData.map(tco => tco.ilicito).filter(Boolean))];
+    
+    // Limpar opções existentes (exceto "Todos os ilícitos")
+    ilicitoSelect.innerHTML = '<option value="">Todos os ilícitos</option>';
+    
+    // Adicionar opções
+    allIlicitos.forEach(ilicito => {
+        const option = document.createElement('option');
+        option.value = ilicito;
+        option.textContent = ilicito;
+        ilicitoSelect.appendChild(option);
+    });
+}
+
+// Restaurar valores dos filtros TCO
+function restoreTCOFilterValues() {
+    const filterRAP = document.getElementById('filterRAP');
+    const filterIlicito = document.getElementById('filterIlicito');
+    const filterItem = document.getElementById('filterItem');
+    
+    if (filterRAP) filterRAP.value = activeFiltersTCO.rap || '';
+    if (filterIlicito) filterIlicito.value = activeFiltersTCO.ilicito || '';
+    if (filterItem) filterItem.value = activeFiltersTCO.item || '';
+}
+
+if (btnApplyFiltersTCO) {
+    btnApplyFiltersTCO.addEventListener('click', () => {
+        applyTCOFilters();
+        if (filterModalTCO) filterModalTCO.classList.remove('active');
+    });
+}
+
+if (btnClearFiltersTCO) {
+    btnClearFiltersTCO.addEventListener('click', () => {
+        clearTCOFilters();
+    });
+}
+
+// Função para verificar se há filtros ativos em TCOs
+function hasActiveTCOFilters() {
+    return !!(activeFiltersTCO.rap || activeFiltersTCO.ilicito || activeFiltersTCO.item);
+}
+
+// Função para atualizar estado visual do botão de filtro de TCOs
+function updateTCOFilterButtonState() {
+    if (filterBtnTCO) {
+        if (hasActiveTCOFilters()) {
+            filterBtnTCO.classList.add('active');
+        } else {
+            filterBtnTCO.classList.remove('active');
+        }
     }
+}
 
-    // Get last 7 days data
-    const last7Days = [];
-    const counts = [];
-    const now = new Date();
+function applyTCOFilters() {
+    const filterRAP = document.getElementById('filterRAP');
+    const filterIlicito = document.getElementById('filterIlicito');
+    const filterItem = document.getElementById('filterItem');
+    
+    // Salvar filtros ativos
+    activeFiltersTCO = {
+        rap: filterRAP ? filterRAP.value.trim() : '',
+        ilicito: filterIlicito ? filterIlicito.value : '',
+        item: filterItem ? filterItem.value.trim() : ''
+    };
+    
+    // Atualizar estado visual do botão
+    updateTCOFilterButtonState();
+    
+    // Aplicar filtros na renderização
+    renderTCOTable();
+}
 
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        last7Days.push(dateStr);
+function clearTCOFilters() {
+    activeFiltersTCO = {
+        rap: '',
+        ilicito: '',
+        item: ''
+    };
+    
+    const filterRAP = document.getElementById('filterRAP');
+    const filterIlicito = document.getElementById('filterIlicito');
+    const filterItem = document.getElementById('filterItem');
+    
+    if (filterRAP) filterRAP.value = '';
+    if (filterIlicito) filterIlicito.value = '';
+    if (filterItem) filterItem.value = '';
+    
+    // Atualizar estado visual do botão
+    updateTCOFilterButtonState();
+    
+    renderTCOTable();
+}
 
-        const count = allOccurrences.filter(occ => {
-            if (!occ.metadata?.dataRegistro) return false;
-            const occDate = new Date(occ.metadata.dataRegistro);
-            return occDate.toDateString() === date.toDateString();
-        }).length;
-        counts.push(count);
+// Atualizar TCOs
+if (refreshBtnTCO) {
+    refreshBtnTCO.addEventListener('click', async () => {
+        refreshBtnTCO.classList.add('loading');
+        refreshBtnTCO.disabled = true;
+        
+        try {
+            await loadTCOs();
+            // Pequeno delay para mostrar a animação
+            setTimeout(() => {
+                refreshBtnTCO.classList.remove('loading');
+                refreshBtnTCO.disabled = false;
+            }, 500);
+        } catch (error) {
+            console.error('Erro ao atualizar TCOs:', error);
+            refreshBtnTCO.classList.remove('loading');
+            refreshBtnTCO.disabled = false;
+        }
+    });
+}
+
+// Exportar TCOs para Excel - Abre modal de filtros
+if (exportBtnTCO) {
+    exportBtnTCO.addEventListener('click', () => {
+        const exportTCOFilterModal = document.getElementById('exportTCOFilterModal');
+        if (exportTCOFilterModal) {
+            // Limpar filtros anteriores
+            document.getElementById('exportTCODataInicial').value = '';
+            document.getElementById('exportTCODataFinal').value = '';
+            
+            // Limpar checkboxes de ilícito
+            document.querySelectorAll('.export-ilicito-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Limpar checkboxes de status
+            document.querySelectorAll('.export-tco-status-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            exportTCOFilterModal.classList.add('active');
+        }
+    });
+}
+
+// Função para aplicar filtros e exportar TCOs
+async function performExportTCOsWithFilters() {
+    const dataInicial = document.getElementById('exportTCODataInicial').value;
+    const dataFinal = document.getElementById('exportTCODataFinal').value;
+    
+    // Obter ilícitos selecionados (checkboxes)
+    const selectedIlicitos = Array.from(document.querySelectorAll('.export-ilicito-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    // Obter status selecionados (checkboxes)
+    const selectedStatuses = Array.from(document.querySelectorAll('.export-tco-status-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    
+    // Fechar modal
+    const exportTCOFilterModal = document.getElementById('exportTCOFilterModal');
+    if (exportTCOFilterModal) {
+        exportTCOFilterModal.classList.remove('active');
     }
-
-    const total = counts.reduce((a, b) => a + b, 0);
-
-    // Update total display
-    const totalElement = document.getElementById('totalDayOccurrences');
-    if (totalElement) {
-        totalElement.textContent = total;
+    
+    // Aplicar filtros
+    let filteredData = [...tcoData];
+    
+    // Para filtrar por data e status, precisamos buscar informações das ocorrências relacionadas
+    // Vamos carregar as ocorrências para fazer o match
+    let occurrencesData = [];
+    if (dataInicial || dataFinal || selectedStatuses.length > 0) {
+        try {
+            const result = await ipcRenderer.invoke('get-occurrences');
+            if (result.success && result.data) {
+                occurrencesData = result.data;
+            }
+        } catch (error) {
+            console.error('Erro ao carregar ocorrências para filtro:', error);
+        }
     }
-
-    barChartDay = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: last7Days,
-            datasets: [{
-                label: 'Ocorrências',
-                data: counts,
-                backgroundColor: '#279b4d',
-                borderColor: '#279b4d',
-                borderWidth: 1,
-                borderRadius: 6,
-                hoverBackgroundColor: '#1f7d3d'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 12,
-                    titleColor: '#fff',
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 1
+    
+    // Criar mapa de RAP -> ocorrência para busca rápida
+    const rapToOccurrence = {};
+    occurrencesData.forEach(occ => {
+        if (occ.ocorrencia?.numeroGenesis) {
+            rapToOccurrence[occ.ocorrencia.numeroGenesis] = occ;
+        }
+    });
+    
+    // Filtro por ilícito (direto do TCO)
+    if (selectedIlicitos.length > 0) {
+        filteredData = filteredData.filter(tco => {
+            return selectedIlicitos.includes(tco.ilicito);
+        });
+    }
+    
+    // Filtro por data e status (precisa buscar da ocorrência relacionada)
+    if (dataInicial || dataFinal || selectedStatuses.length > 0) {
+        filteredData = filteredData.filter(tco => {
+            const occurrence = rapToOccurrence[tco.rap];
+            if (!occurrence) return false; // Se não encontrar ocorrência, excluir
+            
+            // Filtro por data
+            if (dataInicial || dataFinal) {
+                const dataApreensao = occurrence.ocorrencia?.dataApreensao;
+                if (!dataApreensao) return false;
+                
+                try {
+                    const [day, month, year] = dataApreensao.split('/');
+                    if (!day || !month || !year) return false;
+                    
+                    const occDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    occDate.setHours(0, 0, 0, 0);
+                    
+                    if (dataInicial) {
+                        const initDate = new Date(dataInicial + 'T00:00:00');
+                        if (occDate < initDate) return false;
+                    }
+                    
+                    if (dataFinal) {
+                        const finalDate = new Date(dataFinal + 'T23:59:59');
+                        if (occDate > finalDate) return false;
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar data:', error);
+                    return false;
                 }
+            }
+            
+            // Filtro por status
+            if (selectedStatuses.length > 0) {
+                const status = occurrence.ocorrencia?.status;
+                if (!selectedStatuses.includes(status)) return false;
+            }
+            
+            return true;
+        });
+    }
+    
+    // Verificar se há dados para exportar
+    if (filteredData.length === 0) {
+        customAlert.error('Nenhum TCO encontrado com os filtros selecionados.');
+        return;
+    }
+    
+    // Exportar
+    showLoading('Exportando TCOs', `Gerando arquivo Excel com ${filteredData.length} TCO(s)...`);
+    try {
+        const result = await ipcRenderer.invoke('export-tcos', filteredData);
+        hideLoading();
+        if (result.success) {
+            customAlert.success(`Arquivo Excel exportado com sucesso!<br><br><strong>TCOs exportados:</strong> ${filteredData.length}<br><strong>Local:</strong> ${result.filePath}`);
+        } else {
+            customAlert.error('Erro ao exportar: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Erro ao exportar TCOs:', error);
+        hideLoading();
+        customAlert.error('Erro ao exportar arquivo');
+    }
+}
+
+// Funções globais para ações da tabela
+window.viewTCO = function(id) {
+    customAlert.info('Visualização de TCO em desenvolvimento.');
+};
+
+window.editTCO = function(id) {
+    customAlert.info('Edição de TCO em desenvolvimento.');
+};
+
+window.printTCO = function(id) {
+    customAlert.info('Impressão de TCO em desenvolvimento.');
+};
+
+window.deleteTCO = function(id) {
+    // Encontrar o TCO pelo ID
+    const tco = tcoData.find(t => t.id === id);
+    if (!tco) {
+        customAlert.error('TCO não encontrado');
+        return;
+    }
+    
+    customAlert.confirm('Tem certeza que deseja excluir este TCO? Esta ação não pode ser desfeita.', async () => {
+        showLoading('Excluindo TCO', 'Removendo do Google Sheets...');
+        try {
+            const result = await ipcRenderer.invoke('delete-tco', tco.rap);
+            hideLoading();
+            
+            if (result.success) {
+                customAlert.success('TCO excluído com sucesso!');
+                // Recarregar TCOs
+                await loadTCOs();
+            } else {
+                customAlert.error('Erro ao excluir TCO: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Erro ao excluir TCO:', error);
+            hideLoading();
+            customAlert.error('Erro ao excluir TCO: ' + error.message);
+        }
+    });
+};
+
+// Função para obter opções de status baseado na espécie
+function getStatusOptions(especie) {
+    if (!especie) return [];
+    
+    // Converter para maiúsculo para comparação
+    const especieUpper = especie.toUpperCase();
+    
+    if (especieUpper === 'SUBSTÂNCIA') {
+        return ['SECRIMPO', 'INSTITUTO DE CRIMINALISTICA', 'DOP', 'DESTRUIÇÃO'];
+    } else if (especieUpper === 'OBJETO' || especieUpper === 'SIMULACRO' || especieUpper === 'ARMA BRANCA') {
+        return ['SECRIMPO', 'CEGOC', 'IC'];
+    } else {
+        // Se espécie não reconhecida, não mostra opções
+        return [];
+    }
+}
+
+// Função para atualizar status
+window.updateStatus = async function(index, newStatus) {
+    if (!newStatus || newStatus === '') {
+        // Se o status foi limpo, não fazer nada
+        return;
+    }
+    
+    const occurrence = filteredOccurrences[index];
+    if (!occurrence) {
+        customAlert.error('Ocorrência não encontrada');
+        return;
+    }
+    
+    // Validar se o status é válido para a espécie
+    const especie = occurrence.itemApreendido?.especie;
+    const validStatusOptions = getStatusOptions(especie);
+    
+    if (!validStatusOptions.includes(newStatus)) {
+        customAlert.error('Status inválido para esta espécie. Por favor, selecione um status válido.');
+        // Restaurar o valor anterior
+        const statusDropdown = document.querySelector(`.status-dropdown[data-index="${index}"]`);
+        if (statusDropdown) {
+            const previousStatus = occurrence.ocorrencia.status || '';
+            statusDropdown.value = previousStatus;
+        }
+        return;
+    }
+    
+    // Guardar o status anterior para possível reversão
+    const previousStatus = occurrence.ocorrencia.status;
+    
+    try {
+        // Atualizar localmente primeiro para feedback imediato
+        occurrence.ocorrencia.status = newStatus;
+        
+        // Preparar dados para atualização
+        const updatedData = {
+            id: occurrence.id,
+            numeroGenesisOriginal: occurrence.ocorrencia.numeroGenesis,
+            ocorrencia: {
+                numeroGenesis: occurrence.ocorrencia.numeroGenesis,
+                unidade: occurrence.ocorrencia.unidade || '',
+                dataApreensao: occurrence.ocorrencia.dataApreensao || '',
+                leiInfrigida: occurrence.ocorrencia.leiInfrigida || '',
+                artigo: occurrence.ocorrencia.artigo || '',
+                status: newStatus,
+                numeroPje: occurrence.ocorrencia.numeroPje || ''
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        color: '#666'
-                    },
-                    grid: {
-                        color: '#f0f2f5'
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: '#666'
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
+            itemApreendido: {
+                especie: occurrence.itemApreendido?.especie || '',
+                item: occurrence.itemApreendido?.item || '',
+                quantidade: occurrence.itemApreendido?.quantidade || '',
+                descricao: occurrence.itemApreendido?.descricao || ''
+            },
+            proprietario: occurrence.proprietario || {},
+            policial: occurrence.policial || {},
+            metadata: {
+                registradoPor: 'Dashboard',
+                dataRegistro: new Date().toISOString()
             }
-        }
-    });
-}
-
-// Create pie chart - Occurrences by unit with date filter
-function createPieChartUnidadePeriodo() {
-    const ctx = document.getElementById('pieChartUnidadePeriodo');
-    if (!ctx) return;
-
-    // Destroy existing chart
-    if (pieChartUnidadePeriodo) {
-        pieChartUnidadePeriodo.destroy();
-    }
-
-    // Determine date range
-    let startDate, endDate;
-    if (customDateRangeUnidade) {
-        startDate = customDateRangeUnidade.startDate;
-        endDate = customDateRangeUnidade.endDate;
-    } else {
-        // Default: last 30 days
-        endDate = new Date();
-        startDate = new Date();
-        startDate.setDate(startDate.getDate() - 29);
-    }
-
-    // Filtrar ocorrências no período
-    const filteredOccs = allOccurrences.filter(occ => {
-        if (!occ.metadata?.dataRegistro) return false;
-        const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate >= startDate && occDate <= endDate;
-    });
-
-    // Contar por unidade
-    const unitCounts = {};
-    filteredOccs.forEach(occ => {
-        const unit = occ.ocorrencia?.unidade || 'Não especificado';
-        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
-    });
-
-    // Ordenar por quantidade
-    const sortedUnits = Object.entries(unitCounts)
-        .sort((a, b) => b[1] - a[1]);
-
-    const labels = sortedUnits.map(([unit]) => unit);
-    const counts = sortedUnits.map(([, count]) => count);
-    const total = counts.reduce((a, b) => a + b, 0);
-
-    // Update total display
-    const totalElement = document.getElementById('totalUnidadePeriodo');
-    if (totalElement) {
-        totalElement.textContent = total;
-    }
-
-    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-
-    pieChartUnidadePeriodo = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: counts,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
+        };
+        
+        // Enviar atualização para o backend
+        const result = await ipcRenderer.invoke('update-occurrence', updatedData);
+        
+        if (result.success) {
+            customAlert.success('Status atualizado com sucesso!');
+            
+            // Atualizar também no array principal
+            const mainIndex = allOccurrences.findIndex(occ => 
+                occ.ocorrencia?.numeroGenesis === occurrence.ocorrencia.numeroGenesis
+            );
+            if (mainIndex !== -1) {
+                allOccurrences[mainIndex].ocorrencia.status = newStatus;
             }
-        }
-    });
-}
-
-// Create pie chart - Item types with date filter
-function createPieChartItensPeriodo() {
-    const ctx = document.getElementById('pieChartItensPeriodo');
-    if (!ctx) return;
-
-    // Destroy existing chart
-    if (pieChartItensPeriodo) {
-        pieChartItensPeriodo.destroy();
-    }
-
-    // Determine date range
-    let startDate, endDate;
-    if (customDateRangeItens) {
-        startDate = customDateRangeItens.startDate;
-        endDate = customDateRangeItens.endDate;
-    } else {
-        // Default: last 30 days
-        endDate = new Date();
-        startDate = new Date();
-        startDate.setDate(startDate.getDate() - 29);
-    }
-
-    // Filtrar ocorrências no período
-    const filteredOccs = allOccurrences.filter(occ => {
-        if (!occ.metadata?.dataRegistro) return false;
-        const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate >= startDate && occDate <= endDate;
-    });
-
-    // Contar por tipo de item
-    const itemCounts = {};
-    filteredOccs.forEach(occ => {
-        const item = occ.itemApreendido?.item || 'Não especificado';
-        itemCounts[item] = (itemCounts[item] || 0) + 1;
-    });
-
-    // Ordenar por quantidade
-    const sortedItems = Object.entries(itemCounts)
-        .sort((a, b) => b[1] - a[1]);
-
-    const labels = sortedItems.map(([item]) => item);
-    const counts = sortedItems.map(([, count]) => count);
-    const total = counts.reduce((a, b) => a + b, 0);
-
-    // Update total display
-    const totalElement = document.getElementById('totalItensPeriodo');
-    if (totalElement) {
-        totalElement.textContent = total;
-    }
-
-    const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50', '#f44336', '#2196f3', '#ff5722', '#795548'];
-
-    pieChartItensPeriodo = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: counts,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
+            
+            // Não precisamos recarregar a página, apenas atualizar visualmente
+            // renderTable(); // Comentado para evitar piscar da tela
+            
+        } else {
+            // Reverter mudança local se falhar
+            occurrence.ocorrencia.status = previousStatus;
+            const statusDropdown = document.querySelector(`.status-dropdown[data-index="${index}"]`);
+            if (statusDropdown) {
+                statusDropdown.value = previousStatus || '';
             }
+            customAlert.error('Erro ao atualizar status: ' + (result.message || 'Erro desconhecido'));
         }
-    });
-}
-
-// Create pie chart - Occurrences by unit by month
-function createPieChartUnidadeMes() {
-    const ctx = document.getElementById('pieChartUnidadeMes');
-    if (!ctx) return;
-
-    if (pieChartUnidadeMes) {
-        pieChartUnidadeMes.destroy();
+    } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+        console.error('Detalhes do erro:', error.message, error.stack);
+        // Reverter mudança local em caso de erro
+        occurrence.ocorrencia.status = previousStatus;
+        const statusDropdown = document.querySelector(`.status-dropdown[data-index="${index}"]`);
+        if (statusDropdown) {
+            statusDropdown.value = previousStatus || '';
+        }
+        customAlert.error('Erro ao atualizar status: ' + error.message);
     }
+};
 
-    const unitCounts = {};
-    allOccurrences.forEach(occ => {
-        const unit = occ.ocorrencia?.unidade || 'Não especificado';
-        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
-    });
-
-    const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
-    const labels = sortedUnits.map(([unit]) => unit);
-    const data = sortedUnits.map(([, count]) => count);
-    const total = data.reduce((a, b) => a + b, 0);
-
-    const totalElement = document.getElementById('totalUnidadeMes');
-    if (totalElement) totalElement.textContent = total;
-
-    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-
-    pieChartUnidadeMes = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
+// Carregar TCOs quando a aba for ativada
+const originalSetActiveTab = setActiveTab;
+setActiveTab = function(tab) {
+    originalSetActiveTab(tab);
+    if (tab === 'tco') {
+        if (tcoData.length === 0) {
+            loadTCOs();
+        } else {
+            // Atualizar estado do botão mesmo se os dados já estiverem carregados
+            updateTCOFilterButtonState();
         }
-    });
-}
-
-// Create bar chart - Occurrences by unit by day (last 7 days)
-function createBarChartUnidadeDia() {
-    const ctx = document.getElementById('barChartUnidadeDia');
-    if (!ctx) return;
-
-    if (barChartUnidadeDia) {
-        barChartUnidadeDia.destroy();
     }
-
-    // Filtrar ocorrências dos últimos 7 dias
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-
-    const last7DaysOccs = allOccurrences.filter(occ => {
-        if (!occ.metadata?.dataRegistro) return false;
-        const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate >= sevenDaysAgo && occDate <= now;
-    });
-
-    // Agrupar por unidade
-    const unitCounts = {};
-    last7DaysOccs.forEach(occ => {
-        const unit = occ.ocorrencia?.unidade || 'Não especificado';
-        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
-    });
-
-    const sortedUnits = Object.entries(unitCounts).sort((a, b) => b[1] - a[1]);
-    const labels = sortedUnits.map(([unit]) => unit);
-    const counts = sortedUnits.map(([, count]) => count);
-    const total = counts.reduce((a, b) => a + b, 0);
-
-    const totalElement = document.getElementById('totalUnidadeDia');
-    if (totalElement) totalElement.textContent = total;
-
-    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-
-    barChartUnidadeDia = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Ocorrências',
-                data: counts,
-                backgroundColor: colors.slice(0, labels.length),
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1, color: '#666' }, grid: { color: '#f0f2f5' } },
-                x: { ticks: { color: '#666' }, grid: { display: false } }
-            }
-        }
-    });
-}
-
-// Create pie chart - Items by month
-function createPieChartItensMes() {
-    const ctx = document.getElementById('pieChartItensMes');
-    if (!ctx) return;
-
-    if (pieChartItensMes) {
-        pieChartItensMes.destroy();
-    }
-
-    const itemCounts = {};
-    allOccurrences.forEach(occ => {
-        const item = occ.itemApreendido?.item || 'Não especificado';
-        itemCounts[item] = (itemCounts[item] || 0) + 1;
-    });
-
-    const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
-    const labels = sortedItems.map(([item]) => item);
-    const data = sortedItems.map(([, count]) => count);
-    const total = data.reduce((a, b) => a + b, 0);
-
-    const totalElement = document.getElementById('totalItensMes');
-    if (totalElement) totalElement.textContent = total;
-
-    const colors = ['#071d49', '#279b4d', '#fac709', '#c33', '#1976d2', '#f57c00', '#7b1fa2', '#00897b', '#00bcd4', '#ff9800'];
-
-    pieChartItensMes = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Create bar chart - Items by day (last 7 days)
-function createBarChartItensDia() {
-    const ctx = document.getElementById('barChartItensDia');
-    if (!ctx) return;
-
-    if (barChartItensDia) {
-        barChartItensDia.destroy();
-    }
-
-    // Filtrar ocorrências dos últimos 7 dias
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-
-    const last7DaysOccs = allOccurrences.filter(occ => {
-        if (!occ.metadata?.dataRegistro) return false;
-        const occDate = new Date(occ.metadata.dataRegistro);
-        return occDate >= sevenDaysAgo && occDate <= now;
-    });
-
-    // Agrupar por tipo de item
-    const itemCounts = {};
-    last7DaysOccs.forEach(occ => {
-        const item = occ.itemApreendido?.item || 'Não especificado';
-        itemCounts[item] = (itemCounts[item] || 0) + 1;
-    });
-
-    const sortedItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]);
-    const labels = sortedItems.map(([item]) => item);
-    const counts = sortedItems.map(([, count]) => count);
-    const total = counts.reduce((a, b) => a + b, 0);
-
-    const totalElement = document.getElementById('totalItensDia');
-    if (totalElement) totalElement.textContent = total;
-
-    const colors = ['#fac709', '#279b4d', '#071d49', '#c33', '#00bcd4', '#ff9800', '#9c27b0', '#4caf50'];
-
-    barChartItensDia = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Ocorrências',
-                data: counts,
-                backgroundColor: colors.slice(0, labels.length),
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1, color: '#666' }, grid: { color: '#f0f2f5' } },
-                x: { ticks: { color: '#666' }, grid: { display: false } }
-            }
-        }
-    });
-}
-
-// Create pie chart - Occurrences by month
-function createPieChartMonth() {
-    const ctx = document.getElementById('pieChartMonth');
-    if (!ctx) return;
-
-    // Destroy existing chart
-    if (pieChartMonth) {
-        pieChartMonth.destroy();
-    }
-
-    // Count by month
-    const monthCounts = {};
-    const monthNames = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-
-    // Initialize all months with 0
-    monthNames.forEach(month => {
-        monthCounts[month] = 0;
-    });
-
-    // Count occurrences by month
-    allOccurrences.forEach(occ => {
-        if (occ.metadata?.dataRegistro) {
-            const occDate = new Date(occ.metadata.dataRegistro);
-            const monthName = monthNames[occDate.getMonth()];
-            monthCounts[monthName]++;
-        }
-    });
-
-    // Filter out months with 0 occurrences and sort by month order
-    const sortedData = monthNames
-        .map(month => ({ month, count: monthCounts[month] }))
-        .filter(item => item.count > 0);
-
-    const labels = sortedData.map(item => item.month);
-    const data = sortedData.map(item => item.count);
-    const total = data.reduce((a, b) => a + b, 0);
-
-    // Update total display
-    const totalElement = document.getElementById('totalMonthOccurrences');
-    if (totalElement) {
-        totalElement.textContent = total;
-    }
-
-    // Colors for each month
-    const colors = [
-        '#279b4d', '#071d49', '#fac709', '#c33',
-        '#00bcd4', '#ff9800', '#9c27b0', '#4caf50',
-        '#f44336', '#2196f3', '#ff5722', '#795548'
-    ];
-
-    pieChartMonth = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#071d49',
-                    padding: 16,
-                    titleFont: {
-                        size: 0
-                    },
-                    bodyFont: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    bodyColor: '#fff',
-                    borderColor: '#fac709',
-                    borderWidth: 2,
-                    displayColors: false,
-                    callbacks: {
-                        title: function () {
-                            return '';
-                        },
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// ==================== FILTRO DE DATA PERSONALIZADA ====================
-
-// Função para validar data no formato brasileiro
-function isValidDateFilter(dateString) {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    const match = dateString.match(regex);
-
-    if (!match) return false;
-
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    const year = parseInt(match[3], 10);
-
-    if (month < 1 || month > 12) return false;
-    if (day < 1 || day > 31) return false;
-
-    const date = new Date(year, month - 1, day);
-    return date.getFullYear() === year &&
-        date.getMonth() === month - 1 &&
-        date.getDate() === day;
-}
-
-// Função para converter data brasileira para objeto Date
-function brDateToDateObj(brDate) {
-    const [day, month, year] = brDate.split('/');
-    return new Date(year, month - 1, day);
-}
-
-// Aplicar máscara de data nos campos de filtro
-function applyDateMaskFilter(e) {
-    let value = e.target.value.replace(/\D/g, '');
-
-    if (value.length >= 2) {
-        value = value.substring(0, 2) + '/' + value.substring(2);
-    }
-    if (value.length >= 5) {
-        value = value.substring(0, 5) + '/' + value.substring(5, 9);
-    }
-
-    e.target.value = value;
-}
-
-// Event listeners para máscaras de data
-if (filterDataInicio) {
-    filterDataInicio.addEventListener('input', applyDateMaskFilter);
-}
-
-if (filterDataFim) {
-    filterDataFim.addEventListener('input', applyDateMaskFilter);
-}
-
-// Filtrar gráfico por data personalizada
-if (btnFilterChart) {
-    btnFilterChart.addEventListener('click', () => {
-        const dataInicio = filterDataInicio.value;
-        const dataFim = filterDataFim.value;
-
-        if (!dataInicio || !dataFim) {
-            customAlert.error('Por favor, preencha ambas as datas');
-            return;
-        }
-
-        if (!isValidDateFilter(dataInicio)) {
-            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        if (!isValidDateFilter(dataFim)) {
-            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        const startDate = brDateToDateObj(dataInicio);
-        const endDate = brDateToDateObj(dataFim);
-
-        if (startDate > endDate) {
-            customAlert.error('A data de início deve ser anterior à data de fim');
-            return;
-        }
-
-        customDateRange = { startDate, endDate };
-        createLineChart();
-    });
-}
-
-// Resetar filtro para últimos 30 dias
-if (btnResetFilter) {
-    btnResetFilter.addEventListener('click', () => {
-        customDateRange = null;
-        filterDataInicio.value = '';
-        filterDataFim.value = '';
-        createLineChart();
-    });
-}
-
-// ==================== FILTRO DE DATA PARA UNIDADE ====================
-
-// Event listeners para máscaras de data - Unidade
-if (filterDataInicioUnidade) {
-    filterDataInicioUnidade.addEventListener('input', applyDateMaskFilter);
-}
-
-if (filterDataFimUnidade) {
-    filterDataFimUnidade.addEventListener('input', applyDateMaskFilter);
-}
-
-// Filtrar gráfico de Unidade por data personalizada
-if (btnFilterChartUnidade) {
-    btnFilterChartUnidade.addEventListener('click', () => {
-        const dataInicio = filterDataInicioUnidade.value;
-        const dataFim = filterDataFimUnidade.value;
-
-        if (!dataInicio || !dataFim) {
-            customAlert.error('Por favor, preencha ambas as datas');
-            return;
-        }
-
-        if (!isValidDateFilter(dataInicio)) {
-            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        if (!isValidDateFilter(dataFim)) {
-            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        const startDate = brDateToDateObj(dataInicio);
-        const endDate = brDateToDateObj(dataFim);
-
-        if (startDate > endDate) {
-            customAlert.error('A data de início deve ser anterior à data de fim');
-            return;
-        }
-
-        customDateRangeUnidade = { startDate, endDate };
-        createPieChartUnidade();
-    });
-}
-
-// Resetar filtro de Unidade
-if (btnResetFilterUnidade) {
-    btnResetFilterUnidade.addEventListener('click', () => {
-        customDateRangeUnidade = null;
-        filterDataInicioUnidade.value = '';
-        filterDataFimUnidade.value = '';
-        createPieChartUnidade();
-    });
-}
-
-// ==================== FILTRO DE DATA PARA ITENS ====================
-
-// Event listeners para máscaras de data - Itens
-if (filterDataInicioItens) {
-    filterDataInicioItens.addEventListener('input', applyDateMaskFilter);
-}
-
-if (filterDataFimItens) {
-    filterDataFimItens.addEventListener('input', applyDateMaskFilter);
-}
-
-// Filtrar gráfico de Itens por data personalizada
-if (btnFilterChartItens) {
-    btnFilterChartItens.addEventListener('click', () => {
-        const dataInicio = filterDataInicioItens.value;
-        const dataFim = filterDataFimItens.value;
-
-        if (!dataInicio || !dataFim) {
-            customAlert.error('Por favor, preencha ambas as datas');
-            return;
-        }
-
-        if (!isValidDateFilter(dataInicio)) {
-            customAlert.error('Data de início inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        if (!isValidDateFilter(dataFim)) {
-            customAlert.error('Data de fim inválida. Use o formato dd/mm/aaaa');
-            return;
-        }
-
-        const startDate = brDateToDateObj(dataInicio);
-        const endDate = brDateToDateObj(dataFim);
-
-        if (startDate > endDate) {
-            customAlert.error('A data de início deve ser anterior à data de fim');
-            return;
-        }
-
-        customDateRangeItens = { startDate, endDate };
-        createPieChartItens();
-    });
-}
-
-// Resetar filtro de Itens
-if (btnResetFilterItens) {
-    btnResetFilterItens.addEventListener('click', () => {
-        customDateRangeItens = null;
-        filterDataInicioItens.value = '';
-        filterDataFimItens.value = '';
-        createPieChartItens();
-    });
-}
+};

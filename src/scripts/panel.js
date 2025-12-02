@@ -9,6 +9,7 @@ const errorMessage = document.getElementById('errorMessage');
 const userInfo = document.getElementById('userInfo');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
+const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingText = document.getElementById('loadingText');
 const loadingSubtext = document.getElementById('loadingSubtext');
@@ -17,6 +18,18 @@ const loadingSubtext = document.getElementById('loadingSubtext');
 const tabDashboard = document.getElementById('tabDashboard');
 const tabNovaOcorrencia = document.getElementById('tabNovaOcorrencia');
 
+// Função para auto-resize do textarea de descrição
+function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    
+    // Resetar altura para calcular o scrollHeight corretamente
+    textarea.style.height = 'auto';
+    
+    // Definir altura baseada no conteúdo
+    const newHeight = Math.max(80, textarea.scrollHeight);
+    textarea.style.height = newHeight + 'px';
+}
+
 // Carregar informações do usuário
 window.addEventListener('load', () => {
     const username = sessionStorage.getItem('username');
@@ -24,20 +37,25 @@ window.addEventListener('load', () => {
         userInfo.textContent = `${username}`;
     }
     
-    // Inicializar calendários Flatpickr após um pequeno delay
-    setTimeout(() => {
-        console.log('Iniciando calendários...');
-        initializeDatePickers();
-    }, 500);
+    // Limpar formulário ao carregar a página
+    clearForm();
     
-    // Definir data atual no campo de data de apreensão se estiver vazio
-    const dataApreensaoField = document.getElementById('dataApreensao');
-    if (dataApreensaoField && !dataApreensaoField.value) {
-        const today = new Date();
-        const day = String(today.getDate()).padStart(2, '0');
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const year = today.getFullYear();
-        dataApreensaoField.value = `${day}/${month}/${year}`;
+    // Resetar estado de upload ao carregar
+    resetFileUploadState();
+    
+    // Inicializar calendários Flatpickr
+    initializeDatePickers();
+    
+    // Configurar auto-resize para o textarea de descrição
+    const descricaoItem = document.getElementById('descricaoItem');
+    if (descricaoItem) {
+        // Auto-resize ao digitar
+        descricaoItem.addEventListener('input', () => {
+            autoResizeTextarea(descricaoItem);
+        });
+        
+        // Auto-resize inicial
+        autoResizeTextarea(descricaoItem);
     }
 });
 
@@ -47,53 +65,44 @@ occurrenceForm.addEventListener('submit', async (e) => {
     
     // Validar datas antes de enviar
     const dataApreensao = document.getElementById('dataApreensao').value;
-    const dataNascimento = document.getElementById('dataNascimento').value;
-    const numeroGenesis = document.getElementById('numeroGenesis').value;
     
     if (!isValidDate(dataApreensao)) {
         showError('Data de apreensão inválida. Use o formato dd/mm/aaaa');
         return;
     }
     
-    if (!isValidDate(dataNascimento)) {
-        showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
-        return;
+    // Função auxiliar para converter strings para maiúsculas
+    function toUpperCase(value) {
+        return typeof value === 'string' ? value.toUpperCase() : value;
     }
     
-    // Validar formato do número Genesis (deve ter 6 números + hífen + 4 dígitos do ano)
-    const genesisPattern = /^\d{6}-\d{4}$/;
-    if (!genesisPattern.test(numeroGenesis)) {
-        showError('Número Genesis inválido. Deve conter 6 números seguidos de hífen e ano (ex: 123456-2025)');
-        return;
-    }
-    
-    // Coletar dados do formulário
+    // Coletar dados do formulário e converter para maiúsculas
     const formData = {
         ocorrencia: {
-            numeroGenesis: document.getElementById('numeroGenesis').value,
-            unidade: document.getElementById('unidade').value,
+            numeroGenesis: toUpperCase(document.getElementById('numeroGenesis').value),
+            unidade: document.getElementById('unidade').value, // Select mantém valor original
             dataApreensao: brDateToISO(dataApreensao),
-            leiInfrigida: document.getElementById('leiInfrigida').value,
-            artigo: document.getElementById('artigo').value
+            leiInfrigida: toUpperCase(document.getElementById('leiInfrigida').value),
+            artigo: toUpperCase(document.getElementById('artigo').value),
+            status: document.getElementById('status').value, // Select mantém valor original
+            numeroPje: toUpperCase(document.getElementById('numeroPje').value || '')
         },
         itemApreendido: {
-            especie: document.getElementById('especie').value,
-            item: document.getElementById('item').value,
-            quantidade: document.getElementById('quantidade').value,
-            unidadeMedida: document.getElementById('unidadeMedida').value,
-            descricao: document.getElementById('descricaoItem').value
+            especie: document.getElementById('especie').value, // Select mantém valor original
+            item: toUpperCase(document.getElementById('item').value),
+            quantidade: toUpperCase(document.getElementById('quantidade').value),
+            descricao: toUpperCase(document.getElementById('descricaoItem').value)
         },
         proprietario: {
-            nome: document.getElementById('nomeProprietario').value,
-            dataNascimento: brDateToISO(dataNascimento),
-            tipoDocumento: document.getElementById('tipoDocumento').value,
-            numeroDocumento: document.getElementById('numeroDocumento').value
+            nome: toUpperCase(document.getElementById('nomeProprietario').value),
+            tipoDocumento: document.getElementById('tipoDocumento').value, // Select mantém valor original
+            numeroDocumento: toUpperCase(document.getElementById('numeroDocumento').value)
         },
         policial: {
-            nome: document.getElementById('nomePolicial').value,
-            matricula: document.getElementById('matricula').value,
-            graduacao: document.getElementById('graduacao').value,
-            unidade: document.getElementById('unidadePolicial').value
+            nome: toUpperCase(document.getElementById('nomePolicial').value),
+            matricula: toUpperCase(document.getElementById('matricula').value),
+            graduacao: document.getElementById('graduacao').value, // Select mantém valor original
+            unidade: toUpperCase(document.getElementById('unidadePolicial').value)
         },
         metadata: {
             registradoPor: sessionStorage.getItem('username'),
@@ -162,6 +171,119 @@ logoutBtn.addEventListener('click', () => {
     );
 });
 
+// ==================== FUNCIONALIDADE DE SUPORTE ====================
+
+// Elementos do modal de suporte
+const suporteBtn = document.getElementById('suporteBtn');
+const suporteModal = document.getElementById('suporteModal');
+const suporteModalClose = document.getElementById('suporteModalClose');
+const suporteCancelBtn = document.getElementById('suporteCancelBtn');
+const suporteSubmitBtn = document.getElementById('suporteSubmitBtn');
+const suporteForm = document.getElementById('suporteForm');
+
+// Abrir modal de suporte
+if (suporteBtn) {
+    suporteBtn.addEventListener('click', () => {
+        // Preencher nome automaticamente se disponível
+        const username = sessionStorage.getItem('username');
+        if (username && document.getElementById('suporteNome')) {
+            document.getElementById('suporteNome').value = username;
+        }
+        suporteModal.classList.add('active');
+        userDropdown.classList.remove('active'); // Fechar dropdown
+    });
+}
+
+// Fechar modal de suporte
+if (suporteModalClose) {
+    suporteModalClose.addEventListener('click', () => {
+        suporteModal.classList.remove('active');
+        suporteForm.reset();
+    });
+}
+
+if (suporteCancelBtn) {
+    suporteCancelBtn.addEventListener('click', () => {
+        suporteModal.classList.remove('active');
+        suporteForm.reset();
+    });
+}
+
+// Não fechar modal ao clicar fora (modal contém formulário)
+// O modal só fecha através dos botões de fechar/cancelar
+
+// Enviar formulário de suporte
+if (suporteSubmitBtn) {
+    suporteSubmitBtn.addEventListener('click', async () => {
+        if (!suporteForm.checkValidity()) {
+            suporteForm.reportValidity();
+            return;
+        }
+
+        const formData = {
+            nome: document.getElementById('suporteNome').value.trim(),
+            unidade: document.getElementById('suporteUnidade').value,
+            problema: document.getElementById('suporteProblema').value.trim(),
+            prioridade: document.getElementById('suportePrioridade').value,
+            descricao: document.getElementById('suporteDescricao').value.trim()
+        };
+
+        // Validar campos
+        if (!formData.nome || !formData.unidade || !formData.problema || !formData.prioridade || !formData.descricao) {
+            customAlert.error('Por favor, preencha todos os campos obrigatórios.');
+            return;
+        }
+
+        // Desabilitar botão durante envio
+        suporteSubmitBtn.disabled = true;
+        suporteSubmitBtn.textContent = 'Enviando...';
+
+        try {
+            const result = await ipcRenderer.invoke('send-support-request', formData);
+            
+            if (result.success) {
+                customAlert.success('Solicitação de suporte enviada com sucesso!');
+                suporteModal.classList.remove('active');
+                suporteForm.reset();
+            } else {
+                customAlert.error('Erro ao enviar solicitação: ' + (result.message || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Erro ao enviar suporte:', error);
+            customAlert.error('Erro ao enviar solicitação de suporte: ' + error.message);
+        } finally {
+            suporteSubmitBtn.disabled = false;
+            suporteSubmitBtn.textContent = 'Enviar';
+        }
+    });
+}
+
+// ==================== FUNCIONALIDADE DE VERIFICAR ATUALIZAÇÕES ====================
+
+if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener('click', async () => {
+        showLoading('Verificando atualizações', 'Buscando novas versões...');
+        try {
+            const result = await ipcRenderer.invoke('check-updates-manual');
+            hideLoading();
+            
+            if (result && result.error) {
+                customAlert.error('Erro ao verificar atualizações: ' + result.error);
+            } else if (result && result.available) {
+                customAlert.info('Nova versão disponível! Versão ' + result.version + '. Verifique as atualizações no dashboard.');
+            } else if (result && !result.available) {
+                customAlert.success('Você está usando a versão mais recente do aplicativo!');
+            } else {
+                customAlert.info('Não foi possível verificar atualizações no momento. Tente novamente mais tarde.');
+            }
+        } catch (error) {
+            console.error('Erro ao verificar atualizações:', error);
+            hideLoading();
+            customAlert.error('Erro ao verificar atualizações: ' + error.message);
+        }
+    });
+}
+
 // Funções auxiliares
 function showLoading(text = 'Processando', subtext = 'Aguarde um momento') {
     loadingText.textContent = text;
@@ -193,107 +315,42 @@ function hideMessages() {
 }
 
 function clearForm() {
+    if (!occurrenceForm) return;
+    
     occurrenceForm.reset();
     hideMessages();
     hideLoading();
     
     // Reinicializar calendários com data atual
-    initializeDatePickers();
-    
-    // Focar no primeiro campo
-    document.getElementById('numeroGenesis').focus();
-}
-
-// Máscara avançada para data no formato brasileiro (dd/mm/aaaa)
-function applyDateMask(e) {
-    let value = e.target.value;
-    
-    // Permitir apenas números e barras
-    value = value.replace(/[^\d\/]/g, '');
-    
-    // Remover barras extras
-    value = value.replace(/\/+/g, '/');
-    
-    // Aplicar formatação automática
-    let numbers = value.replace(/\D/g, '');
-    
-    if (numbers.length >= 2) {
-        let day = numbers.substring(0, 2);
-        let month = numbers.substring(2, 4);
-        let year = numbers.substring(4, 8);
-        
-        // Validar dia (01-31)
-        if (parseInt(day) > 31) {
-            day = '31';
-        }
-        if (parseInt(day) < 1 && day.length === 2) {
-            day = '01';
-        }
-        
-        // Validar mês (01-12)
-        if (month.length > 0) {
-            if (parseInt(month) > 12) {
-                month = '12';
-            }
-            if (parseInt(month) < 1 && month.length === 2) {
-                month = '01';
-            }
-        }
-        
-        // Montar a data formatada
-        value = day;
-        if (month.length > 0) {
-            value += '/' + month;
-        }
-        if (year.length > 0) {
-            value += '/' + year;
-        }
-    } else {
-        value = numbers;
+    if (typeof initializeDatePickers === 'function') {
+        initializeDatePickers();
     }
     
-    // Limitar o comprimento total
-    if (value.length > 10) {
-        value = value.substring(0, 10);
+    // Resetar altura do textarea de descrição
+    const descricaoItem = document.getElementById('descricaoItem');
+    if (descricaoItem) {
+        autoResizeTextarea(descricaoItem);
+    }
+    
+    // Focar no primeiro campo se existir
+    const numeroGenesis = document.getElementById('numeroGenesis');
+    if (numeroGenesis) {
+        numeroGenesis.focus();
+    }
+}
+
+// Máscara para data no formato brasileiro (dd/mm/aaaa)
+function applyDateMask(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    
+    if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (value.length >= 5) {
+        value = value.substring(0, 5) + '/' + value.substring(5, 9);
     }
     
     e.target.value = value;
-}
-
-// Função para filtrar entrada de teclas em campos de data
-function filterDateInput(e) {
-    const key = e.key;
-    const value = e.target.value;
-    
-    // Permitir teclas de controle
-    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
-        return true;
-    }
-    
-    // Permitir Ctrl+A, Ctrl+C, Ctrl+V, etc.
-    if (e.ctrlKey || e.metaKey) {
-        return true;
-    }
-    
-    // Permitir apenas números e barra
-    if (!/[\d\/]/.test(key)) {
-        e.preventDefault();
-        return false;
-    }
-    
-    // Não permitir mais de 2 barras
-    if (key === '/' && (value.match(/\//g) || []).length >= 2) {
-        e.preventDefault();
-        return false;
-    }
-    
-    // Não permitir mais de 10 caracteres
-    if (value.length >= 10 && !['Backspace', 'Delete'].includes(key)) {
-        e.preventDefault();
-        return false;
-    }
-    
-    return true;
 }
 
 // Validar data no formato brasileiro
@@ -310,50 +367,10 @@ function isValidDate(dateString) {
     if (month < 1 || month > 12) return false;
     if (day < 1 || day > 31) return false;
     
-    // Validar dias por mês
-    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    
-    // Verificar ano bissexto
-    if (month === 2 && isLeapYear(year)) {
-        daysInMonth[1] = 29;
-    }
-    
-    if (day > daysInMonth[month - 1]) return false;
-    
     const date = new Date(year, month - 1, day);
     return date.getFullYear() === year && 
            date.getMonth() === month - 1 && 
            date.getDate() === day;
-}
-
-// Verificar se é ano bissexto
-function isLeapYear(year) {
-    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-}
-
-// Validar data parcial durante a digitação
-function validatePartialDate(value) {
-    const parts = value.split('/');
-    
-    if (parts.length >= 1) {
-        const day = parseInt(parts[0]);
-        if (parts[0].length === 2 && (day < 1 || day > 31)) {
-            return false;
-        }
-    }
-    
-    if (parts.length >= 2) {
-        const month = parseInt(parts[1]);
-        if (parts[1].length === 2 && (month < 1 || month > 12)) {
-            return false;
-        }
-    }
-    
-    if (parts.length === 3 && parts[2].length === 4) {
-        return isValidDate(value);
-    }
-    
-    return true;
 }
 
 // Converter data brasileira para ISO (yyyy-mm-dd)
@@ -362,156 +379,9 @@ function brDateToISO(brDate) {
     return `${year}-${month}-${day}`;
 }
 
-// Inicializar calendários Flatpickr
+// Função vazia para manter compatibilidade
 function initializeDatePickers() {
-    // Usar Flatpickr global (carregado via script tag)
-    if (typeof flatpickr !== 'undefined') {
-        console.log('Flatpickr disponível globalmente');
-    
-    // Configurar calendário para data de apreensão
-    const dataApreensaoField = document.getElementById('dataApreensao');
-    if (dataApreensaoField) {
-        const fpInstance = window.flatpickr(dataApreensaoField, {
-            locale: window.flatpickr.l10ns.pt || 'default',
-            dateFormat: 'd/m/Y',
-            defaultDate: new Date(),
-            allowInput: true,
-            clickOpens: true,
-            disableMobile: false,
-            onChange: function(selectedDates, dateStr, instance) {
-                console.log('Data de apreensão selecionada:', dateStr);
-                // Atualizar o número Genesis quando a data mudar
-                updateGenesisWithYear();
-            },
-            onClose: function(selectedDates, dateStr, instance) {
-                // Validar a data quando o calendário fechar
-                if (dateStr && !isValidDate(dateStr)) {
-                    showError('Data inválida. Use o formato dd/mm/aaaa');
-                    instance.clear();
-                }
-            }
-        });
-        
-        // Adicionar filtros para entrada manual
-        dataApreensaoField.addEventListener('keydown', filterDateInput);
-        dataApreensaoField.addEventListener('input', function(e) {
-            // Só aplicar máscara se não for um evento do Flatpickr
-            if (!fpInstance.isOpen) {
-                applyDateMask(e);
-                
-                // Validar data parcial e dar feedback visual
-                const value = e.target.value;
-                if (value.length >= 8) {
-                    if (validatePartialDate(value)) {
-                        e.target.style.borderColor = '';
-                        e.target.style.backgroundColor = '';
-                    } else {
-                        e.target.style.borderColor = '#f44336';
-                        e.target.style.backgroundColor = '#ffebee';
-                    }
-                }
-                
-                updateGenesisWithYear();
-            }
-        });
-    }
-    
-    // Configurar calendário para data de nascimento
-    const dataNascimentoField = document.getElementById('dataNascimento');
-    console.log('Campo dataNascimento encontrado:', !!dataNascimentoField);
-    if (dataNascimentoField) {
-        const fpInstanceNasc = window.flatpickr(dataNascimentoField, {
-            locale: window.flatpickr.l10ns.pt || 'default',
-            dateFormat: 'd/m/Y',
-            allowInput: true,
-            clickOpens: true,
-            maxDate: new Date(),
-            disableMobile: false,
-            onChange: function(selectedDates, dateStr, instance) {
-                console.log('Data de nascimento selecionada:', dateStr);
-                // Remover estilos de erro se houver
-                instance.input.style.borderColor = '';
-                instance.input.style.backgroundColor = '';
-            },
-            onOpen: function(selectedDates, dateStr, instance) {
-                console.log('Calendário de nascimento aberto');
-            },
-            onClose: function(selectedDates, dateStr, instance) {
-                console.log('Calendário de nascimento fechado');
-                if (dateStr && !isValidDate(dateStr)) {
-                    showError('Data de nascimento inválida. Use o formato dd/mm/aaaa');
-                    instance.clear();
-                }
-            }
-        });
-        
-        // Configurar eventos após a inicialização do Flatpickr
-        setTimeout(() => {
-            // Event listener para digitação manual
-            dataNascimentoField.addEventListener('keydown', function(e) {
-                if (!fpInstanceNasc.isOpen) {
-                    filterDateInputSimple(e);
-                }
-            });
-            
-            dataNascimentoField.addEventListener('input', function(e) {
-                if (!fpInstanceNasc.isOpen) {
-                    applySimpleDateMask(e);
-                }
-            });
-        }, 100);
-        
-        // Validar quando sair do campo
-        dataNascimentoField.addEventListener('blur', function(e) {
-            const value = e.target.value;
-            if (value.length === 10) {
-                if (isValidDate(value)) {
-                    e.target.style.borderColor = '';
-                    e.target.style.backgroundColor = '';
-                } else {
-                    e.target.style.borderColor = '#f44336';
-                    e.target.style.backgroundColor = '#ffebee';
-                    showError('Data de nascimento inválida. Verifique o formato dd/mm/aaaa');
-                }
-            }
-        });
-    }
-    } else {
-        console.log('Flatpickr não disponível, usando apenas máscaras');
-        // Fallback: manter funcionalidade de máscara manual
-        document.getElementById('dataApreensao').addEventListener('input', applyDateMask);
-        document.getElementById('dataNascimento').addEventListener('input', applySimpleDateMask);
-    }
-}
-
-// Função alternativa para usar Flatpickr global
-function initializeFlatpickrGlobal() {
-    const flatpickr = window.flatpickr;
-    
-    // Data de apreensão
-    const dataApreensaoField = document.getElementById('dataApreensao');
-    if (dataApreensaoField) {
-        flatpickr(dataApreensaoField, {
-            dateFormat: 'd/m/Y',
-            defaultDate: new Date(),
-            allowInput: true,
-            clickOpens: true
-        });
-    }
-    
-    // Data de nascimento
-    const dataNascimentoField = document.getElementById('dataNascimento');
-    if (dataNascimentoField) {
-        flatpickr(dataNascimentoField, {
-            dateFormat: 'd/m/Y',
-            allowInput: true,
-            clickOpens: true,
-            maxDate: new Date()
-        });
-        
-        // Adicionar máscara para digitação manual
-        dataNascimentoField.addEventListener('input', applySimpleDateMask);
-    }
+    // Calendário removido
 }
 
 // Função para formatar CPF: 000.000.000-00
@@ -591,177 +461,35 @@ document.getElementById('tipoDocumento').addEventListener('change', function(e) 
     }
 });
 
-// Função para formatar automaticamente o Nº Genesis
-function formatGenesisNumber(input) {
-    let value = input.replace(/\D/g, ''); // Remove tudo que não é número
-    
-    // Se tem mais de 6 dígitos, mantém apenas os primeiros 6
-    if (value.length > 6) {
-        value = value.substring(0, 6);
-    }
-    
-    return value;
-}
-
 // Função para atualizar o Nº Genesis com o ano automaticamente
 function updateGenesisWithYear() {
     const dataApreensao = document.getElementById('dataApreensao').value;
     const numeroGenesis = document.getElementById('numeroGenesis');
-    let currentValue = numeroGenesis.value;
     
-    // Extrair apenas os números do campo Genesis
-    let genesisNumbers = formatGenesisNumber(currentValue);
-    
-    // Determinar o ano a ser usado
-    let yearToUse = new Date().getFullYear(); // Ano atual por padrão
-    
-    // Se a data de apreensão está preenchida e válida, usar o ano dela
+    // Verificar se a data está completa (dd/mm/aaaa)
     if (dataApreensao.length === 10 && isValidDate(dataApreensao)) {
-        yearToUse = parseInt(dataApreensao.split('/')[2]);
-    }
-    
-    // Se tem 6 dígitos, adicionar o hífen e o ano
-    if (genesisNumbers.length === 6) {
-        const newValue = genesisNumbers + '-' + yearToUse;
-        if (numeroGenesis.value !== newValue) {
-            numeroGenesis.value = newValue;
-            
-            // Adicionar feedback visual temporário
-            numeroGenesis.style.backgroundColor = '#e8f5e9';
-            numeroGenesis.style.borderColor = '#4caf50';
-            setTimeout(() => {
-                numeroGenesis.style.backgroundColor = '';
-                numeroGenesis.style.borderColor = '';
-            }, 1000);
+        const year = dataApreensao.split('/')[2]; // Extrair o ano
+        const currentValue = numeroGenesis.value;
+        
+        // Remover ano anterior se existir (formato: xxxx-yyyy)
+        const valueWithoutYear = currentValue.replace(/-\d{4}$/, '');
+        
+        // Adicionar o novo ano
+        if (valueWithoutYear) {
+            numeroGenesis.value = valueWithoutYear + '-' + year;
         }
-    } else if (genesisNumbers.length > 0 && genesisNumbers.length < 6) {
-        // Se tem menos de 6 dígitos, mostrar apenas os números
-        numeroGenesis.value = genesisNumbers;
     }
 }
 
-// Event listener removido - agora está integrado no Flatpickr
+// Atualizar Nº Genesis quando a data de apreensão mudar
+document.getElementById('dataApreensao').addEventListener('input', function(e) {
+    applyDateMask(e);
+    updateGenesisWithYear();
+});
 
 // Atualizar Nº Genesis quando o número for digitado
 document.getElementById('numeroGenesis').addEventListener('input', function(e) {
-    // Aplicar formatação em tempo real
-    const cursorPosition = e.target.selectionStart;
-    const oldValue = e.target.value;
-    
     updateGenesisWithYear();
-    
-    // Manter o cursor na posição correta após a formatação
-    const newValue = e.target.value;
-    if (oldValue !== newValue) {
-        // Se o valor mudou (foi formatado), ajustar a posição do cursor
-        let newCursorPosition = cursorPosition;
-        if (newValue.includes('-') && !oldValue.includes('-')) {
-            // Se o hífen foi adicionado, não mover o cursor
-            if (cursorPosition > 6) {
-                newCursorPosition = newValue.length;
-            }
-        }
-        setTimeout(() => {
-            e.target.setSelectionRange(newCursorPosition, newCursorPosition);
-        }, 0);
-    }
-});
-
-// Adicionar placeholder e dica visual nos campos
-document.addEventListener('DOMContentLoaded', function() {
-    const genesisField = document.getElementById('numeroGenesis');
-    if (genesisField) {
-        genesisField.placeholder = 'Digite os 6 números (ex: 123456)';
-        genesisField.title = 'Digite apenas os 6 números do GENESIS. O ano será adicionado automaticamente.';
-        
-        // Limitar a 11 caracteres (6 números + hífen + 4 dígitos do ano)
-        genesisField.maxLength = 11;
-        
-        // Tratar evento de colar (paste)
-        genesisField.addEventListener('paste', function(e) {
-            e.preventDefault();
-            
-            // Obter o texto colado
-            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-            
-            // Extrair apenas números
-            const numbersOnly = pastedText.replace(/\D/g, '');
-            
-            // Se tem exatamente 6 números, usar a função de formatação
-            if (numbersOnly.length >= 6) {
-                const genesisNumbers = numbersOnly.substring(0, 6);
-                this.value = genesisNumbers;
-                updateGenesisWithYear();
-            } else {
-                // Se tem menos de 6 números, apenas inserir os números
-                this.value = numbersOnly;
-            }
-        });
-    }
-    
-    // Configurar campo de data de nascimento
-    const dataNascField = document.getElementById('dataNascimento');
-    if (dataNascField) {
-        dataNascField.placeholder = 'dd/mm/aaaa ou clique para calendário';
-        dataNascField.title = 'Digite diretamente (barras automáticas) ou clique no ícone para abrir o calendário';
-        dataNascField.maxLength = 10;
-    }
-});
-
-// Máscara simples para data de nascimento - adiciona barras automaticamente
-function applySimpleDateMask(e) {
-    let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
-    
-    // Limitar a 8 dígitos
-    if (value.length > 8) {
-        value = value.substring(0, 8);
-    }
-    
-    // Adicionar barras automaticamente
-    if (value.length >= 2) {
-        value = value.substring(0, 2) + '/' + value.substring(2);
-    }
-    if (value.length >= 5) {
-        value = value.substring(0, 5) + '/' + value.substring(5);
-    }
-    
-    e.target.value = value;
-}
-
-// Filtro simples de teclas para data de nascimento
-function filterDateInputSimple(e) {
-    const key = e.key;
-    
-    // Permitir teclas de controle
-    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
-        return true;
-    }
-    
-    // Permitir Ctrl+A, Ctrl+C, Ctrl+V, etc.
-    if (e.ctrlKey || e.metaKey) {
-        return true;
-    }
-    
-    // Permitir apenas números
-    if (!/\d/.test(key)) {
-        e.preventDefault();
-        return false;
-    }
-    
-    // Não permitir mais de 10 caracteres (incluindo as barras)
-    if (e.target.value.length >= 10) {
-        e.preventDefault();
-        return false;
-    }
-    
-    return true;
-}
-
-// Event listeners para data de nascimento foram movidos para dentro da configuração do Flatpickr
-
-// Navigation tab events
-tabDashboard.addEventListener('click', () => {
-    ipcRenderer.send('load-dashboard');
 });
 
 // ==================== FUNCIONALIDADE DE PREENCHIMENTO POR ARQUIVO ====================
@@ -787,41 +515,104 @@ const extractBtn = document.getElementById('extractBtn');
 
 let selectedFile = null;
 
+// Função para resetar estado de upload de arquivo
+function resetFileUploadState() {
+    selectedFile = null;
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    if (uploadArea) {
+        uploadArea.style.display = 'block';
+    }
+    if (fileInfo) {
+        fileInfo.style.display = 'none';
+    }
+    if (uploadArea) {
+        uploadArea.classList.remove('drag-over');
+    }
+}
+
+// Navigation tab events
+tabDashboard.addEventListener('click', () => {
+    // Limpar formulário ao sair da tela de nova ocorrência
+    clearForm();
+    // Resetar estado de upload
+    resetFileUploadState();
+    // Resetar para tela de seleção de modo
+    if (modeSelectionScreen) modeSelectionScreen.style.display = 'flex';
+    if (formWrapper) formWrapper.style.display = 'none';
+    if (fileUploadSection) fileUploadSection.style.display = 'none';
+    ipcRenderer.send('load-dashboard');
+});
+
 // Navegar para modo manual - vai direto para o formulário
 selectManualMode.addEventListener('click', () => {
+    // Limpar formulário antes de mostrar
+    clearForm();
     modeSelectionScreen.style.display = 'none';
     formWrapper.style.display = 'block';
+    // Garantir que o textarea tenha altura correta ao mostrar o formulário
+    setTimeout(() => {
+        const descricaoItem = document.getElementById('descricaoItem');
+        if (descricaoItem) {
+            autoResizeTextarea(descricaoItem);
+        }
+    }, 10);
 });
 
 // Modo arquivo - abre o seletor de arquivo imediatamente
-selectFileMode.addEventListener('click', () => {
-    fileInput.click();
+selectFileMode.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Resetar estado de upload antes de abrir seletor
+    resetFileUploadState();
+    // Mostrar tela de upload
+    modeSelectionScreen.style.display = 'none';
+    fileUploadSection.style.display = 'block';
+    // Limpar o valor do input para garantir que o evento change seja disparado
+    if (fileInput) {
+        fileInput.value = '';
+        // Abrir seletor imediatamente
+        fileInput.click();
+    }
 });
 
 // Voltar da tela de upload para seleção
 backFromFileBtn.addEventListener('click', () => {
     fileUploadSection.style.display = 'none';
     modeSelectionScreen.style.display = 'flex';
-    // Limpar arquivo selecionado
-    if (selectedFile) {
-        removeFileBtn.click();
-    }
+    // Resetar completamente o estado de upload
+    resetFileUploadState();
+    // Limpar formulário se estiver preenchido
+    clearForm();
 });
 
 // Voltar da tela de formulário para seleção
 backFromFormBtn.addEventListener('click', () => {
+    // Limpar formulário ao voltar
+    clearForm();
     formWrapper.style.display = 'none';
     modeSelectionScreen.style.display = 'flex';
 });
 
 // Abrir seletor de arquivo
-selectFileBtn.addEventListener('click', () => {
-    fileInput.click();
+selectFileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Limpar valor do input para garantir que o evento change seja disparado
+    if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+    }
 });
 
 uploadArea.addEventListener('click', (e) => {
-    if (e.target === uploadArea || e.target.closest('.upload-area')) {
-        fileInput.click();
+    // Só abrir seletor se clicar diretamente na área de upload, não em elementos filhos
+    if (e.target === uploadArea || (e.target.closest('.upload-area') && e.target === uploadArea)) {
+        e.stopPropagation();
+        // Limpar valor do input para garantir que o evento change seja disparado
+        if (fileInput) {
+            fileInput.value = '';
+            fileInput.click();
+        }
     }
 });
 
@@ -878,10 +669,7 @@ function handleFileSelect(file) {
 
 // Remover arquivo selecionado
 removeFileBtn.addEventListener('click', () => {
-    selectedFile = null;
-    fileInput.value = '';
-    uploadArea.style.display = 'block';
-    fileInfo.style.display = 'none';
+    resetFileUploadState();
 });
 
 // Extrair dados do arquivo
@@ -909,6 +697,11 @@ extractBtn.addEventListener('click', async () => {
             setTimeout(() => {
                 fileUploadSection.style.display = 'none';
                 formWrapper.style.display = 'block';
+                // Garantir que o textarea tenha altura correta após preencher dados
+                const descricaoItem = document.getElementById('descricaoItem');
+                if (descricaoItem) {
+                    autoResizeTextarea(descricaoItem);
+                }
             }, 2000);
         } else {
             showError(result.message || 'Erro ao extrair dados do arquivo');
@@ -922,44 +715,100 @@ extractBtn.addEventListener('click', async () => {
 
 // Função para preencher o formulário com dados extraídos
 function fillFormWithExtractedData(data) {
-    // Preencher campos se os dados existirem
+    // Função auxiliar para converter strings para maiúsculas
+    function toUpperCase(value) {
+        return typeof value === 'string' ? value.toUpperCase() : value;
+    }
+    
+    // Dados da Ocorrência
     if (data.numeroGenesis) {
-        document.getElementById('numeroGenesis').value = data.numeroGenesis;
+        document.getElementById('numeroGenesis').value = toUpperCase(data.numeroGenesis);
+    }
+    
+    if (data.unidade) {
+        const unidadeField = document.getElementById('unidade');
+        if (unidadeField) {
+            unidadeField.value = data.unidade;
+        }
     }
     
     if (data.dataApreensao) {
         document.getElementById('dataApreensao').value = data.dataApreensao;
     }
     
+    if (data.leiInfrigida) {
+        document.getElementById('leiInfrigida').value = toUpperCase(data.leiInfrigida);
+    }
+    
     if (data.artigo) {
-        document.getElementById('artigo').value = data.artigo;
+        document.getElementById('artigo').value = toUpperCase(data.artigo);
+    }
+    
+    if (data.numeroPje) {
+        document.getElementById('numeroPje').value = toUpperCase(data.numeroPje);
+    }
+    
+    // Item Apreendido
+    if (data.especie) {
+        document.getElementById('especie').value = data.especie; // Select mantém valor original
+        // Trigger change event para atualizar as opções do status
+        document.getElementById('especie').dispatchEvent(new Event('change'));
+    }
+    
+    if (data.item) {
+        document.getElementById('item').value = toUpperCase(data.item);
     }
     
     if (data.quantidade) {
-        document.getElementById('quantidade').value = data.quantidade;
+        document.getElementById('quantidade').value = toUpperCase(data.quantidade);
     }
     
-    // Dados do proprietário
+    if (data.descricaoItem) {
+        const descricaoItem = document.getElementById('descricaoItem');
+        if (descricaoItem) {
+            descricaoItem.value = data.descricaoItem;
+            // Ajustar altura após preencher
+            autoResizeTextarea(descricaoItem);
+        }
+    }
+    
+    if (data.status) {
+        // Aguardar um pouco para que as opções do status sejam carregadas
+        setTimeout(() => {
+            document.getElementById('status').value = data.status; // Select mantém valor original
+        }, 100);
+    }
+    
+    // Dados do Proprietário
     if (data.nomeProprietario) {
-        document.getElementById('nomeProprietario').value = data.nomeProprietario;
-    }
-    
-    if (data.dataNascimento) {
-        document.getElementById('dataNascimento').value = data.dataNascimento;
+        document.getElementById('nomeProprietario').value = toUpperCase(data.nomeProprietario);
     }
     
     if (data.tipoDocumento) {
-        document.getElementById('tipoDocumento').value = data.tipoDocumento;
+        document.getElementById('tipoDocumento').value = data.tipoDocumento; // Select mantém valor original
         // Trigger change event para aplicar máscara
         document.getElementById('tipoDocumento').dispatchEvent(new Event('change'));
     }
     
     if (data.numeroDocumento) {
-        document.getElementById('numeroDocumento').value = data.numeroDocumento;
+        document.getElementById('numeroDocumento').value = toUpperCase(data.numeroDocumento);
+    }
+    
+    // Dados do Policial
+    if (data.nomePolicial) {
+        document.getElementById('nomePolicial').value = toUpperCase(data.nomePolicial);
     }
     
     if (data.matricula) {
-        document.getElementById('matricula').value = data.matricula;
+        document.getElementById('matricula').value = toUpperCase(data.matricula);
+    }
+    
+    if (data.graduacao) {
+        document.getElementById('graduacao').value = data.graduacao; // Select mantém valor original
+    }
+    
+    if (data.unidadePolicial) {
+        document.getElementById('unidadePolicial').value = toUpperCase(data.unidadePolicial);
     }
     
     // Adicionar classe de destaque aos campos preenchidos
@@ -993,4 +842,139 @@ function formatFileSize(bytes) {
     
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
+
+// Função para converter texto para maiúsculas
+function convertToUpperCase(e) {
+    const input = e.target;
+    const cursorPosition = input.selectionStart;
+    const originalValue = input.value;
+    const upperValue = originalValue.toUpperCase();
+    
+    // Só atualizar se o valor mudou (evita loop infinito)
+    if (originalValue !== upperValue) {
+        input.value = upperValue;
+        // Restaurar posição do cursor
+        input.setSelectionRange(cursorPosition, cursorPosition);
+    }
+}
+
+// Aplicar conversão para maiúsculas em todos os campos de texto
+function applyUpperCaseToTextFields() {
+    // Lista de IDs dos campos de texto que devem ser convertidos para maiúsculas
+    const textFields = [
+        'numeroGenesis',
+        'dataApreensao',
+        'leiInfrigida',
+        'artigo',
+        'numeroPje',
+        'item',
+        'quantidade',
+        'descricaoItem',
+        'nomeProprietario',
+        'numeroDocumento',
+        'nomePolicial',
+        'matricula',
+        'unidadePolicial'
+    ];
+    
+    textFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            // Converter ao digitar
+            field.addEventListener('input', convertToUpperCase);
+            // Converter ao colar
+            field.addEventListener('paste', function(e) {
+                setTimeout(() => convertToUpperCase(e), 0);
+            });
+        }
+    });
+}
+
+// Inicializar autocomplete para leis quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar conversão para maiúsculas em todos os campos de texto
+    applyUpperCaseToTextFields();
+    
+    // Inicializar autocomplete para o campo Lei Infringida
+    const leiInput = document.getElementById('leiInfrigida');
+    if (leiInput) {
+        // Converter sigla antiga para nome completo se existir
+        if (leiInput.value && typeof converterSiglaParaNome === 'function') {
+            const nomeCompleto = converterSiglaParaNome(leiInput.value);
+            if (nomeCompleto !== leiInput.value) {
+                leiInput.value = nomeCompleto;
+            }
+        }
+        
+        const autocompleteLei = initAutocompleteLeis(leiInput, {
+            onSelect: function(leiSelecionada) {
+                console.log('Lei selecionada:', leiSelecionada);
+                // Aqui você pode adicionar lógica adicional quando uma lei for selecionada
+            }
+        });
+        
+        // Escutar evento customizado de seleção
+        leiInput.addEventListener('leiSelecionada', function(event) {
+            const lei = event.detail;
+            console.log('Evento leiSelecionada disparado:', lei);
+            
+            // Você pode adicionar validações ou ações específicas aqui
+            // Por exemplo, limpar o campo artigo quando uma nova lei for selecionada
+            const artigoInput = document.getElementById('artigo');
+            if (artigoInput && artigoInput.value) {
+                // Opcional: perguntar se deseja limpar o campo artigo
+                // artigoInput.value = '';
+            }
+        });
+        
+        // Converter sigla para nome completo quando o campo perder o foco (se for uma sigla conhecida)
+        leiInput.addEventListener('blur', function() {
+            if (leiInput.value && typeof converterSiglaParaNome === 'function') {
+                const nomeCompleto = converterSiglaParaNome(leiInput.value);
+                if (nomeCompleto !== leiInput.value) {
+                    leiInput.value = nomeCompleto;
+                }
+            }
+        });
+    }
+    
+    // Configurar lógica do campo Status baseado na Espécie
+    const especieSelect = document.getElementById('especie');
+    const statusSelect = document.getElementById('status');
+    
+    if (especieSelect && statusSelect) {
+        especieSelect.addEventListener('change', function() {
+            const especieSelecionada = this.value;
+            
+            // Limpar opções atuais
+            statusSelect.innerHTML = '';
+            
+            if (!especieSelecionada) {
+                statusSelect.innerHTML = '<option value="">Selecione primeiro a espécie...</option>';
+                statusSelect.disabled = true;
+                return;
+            }
+            
+            // Adicionar opção padrão
+            statusSelect.innerHTML = '<option value="">Selecione...</option>';
+            statusSelect.disabled = false;
+            
+            if (especieSelecionada === 'SUBSTÂNCIA') {
+                // Opções para SUBSTÂNCIA
+                statusSelect.innerHTML += '<option value="SECRIMPO">SECRIMPO</option>';
+                statusSelect.innerHTML += '<option value="INSTITUTO DE CRIMINALISTICA">INSTITUTO DE CRIMINALISTICA</option>';
+                statusSelect.innerHTML += '<option value="DOP">DOP</option>';
+                statusSelect.innerHTML += '<option value="DESTRUIÇÃO">DESTRUIÇÃO</option>';
+            } else {
+                // Opções para OBJETO, SIMULACRO e ARMA BRANCA
+                statusSelect.innerHTML += '<option value="SECRIMPO">SECRIMPO</option>';
+                statusSelect.innerHTML += '<option value="CEGOC">CEGOC</option>';
+                statusSelect.innerHTML += '<option value="IC">IC</option>';
+            }
+        });
+        
+        // Inicializar o campo como desabilitado
+        statusSelect.disabled = true;
+    }
+});
 

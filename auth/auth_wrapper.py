@@ -22,9 +22,9 @@ else:
     sys.path.insert(0, bundle_dir)
 
 # Configurações KeyAuth
-KEYAUTH_NAME = "SECRIMPO_PMDF"
-KEYAUTH_OWNERID = "4Roety0GwG"
-KEYAUTH_VERSION = "1.0"
+KEYAUTH_NAME = "Credencial Removida"
+KEYAUTH_OWNERID = "Credencial Removida"
+KEYAUTH_VERSION = "Credencial Removida"
 
 # Importar KeyAuth oficial
 try:

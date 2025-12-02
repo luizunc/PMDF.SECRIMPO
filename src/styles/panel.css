@@ -180,6 +180,30 @@ body {
     color: #c33;
 }
 
+/* Botão Verificar Atualizações - cor verde */
+#checkUpdatesBtn {
+    color: #28a745;
+}
+
+#checkUpdatesBtn:hover {
+    background: #f8f9fa;
+    color: #218838;
+}
+
+#checkUpdatesBtn .dropdown-icon {
+    color: #28a745;
+}
+
+#checkUpdatesBtn:hover .dropdown-icon {
+    color: #218838;
+}
+
+.dropdown-item .dropdown-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
 .dropdown-item .logout-icon {
     width: 22px;
     height: 22px;
@@ -341,8 +365,9 @@ body {
 }
 
 .form-group textarea {
-    resize: vertical;
+    resize: none;
     min-height: 80px;
+    overflow-y: hidden;
 }
 
 .form-group select {
@@ -431,6 +456,144 @@ body {
     background: #f8d7da;
     color: #721c24;
     border-left: 4px solid #c33;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    padding: 24px 30px;
+    border-bottom: 2px solid #f0f2f5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-header h2 {
+    color: #071d49;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.modal-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: #f0f2f5;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: #e0e0e0;
+}
+
+.modal-close svg {
+    width: 20px;
+    height: 20px;
+    color: #666;
+}
+
+.modal-body {
+    padding: 30px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 20px 30px;
+    border-top: 2px solid #f0f2f5;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+/* Formulário de Suporte */
+.suporte-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.suporte-form .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.suporte-form .form-group label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.suporte-form .form-group input,
+.suporte-form .form-group select,
+.suporte-form .form-group textarea {
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.suporte-form .form-group input:focus,
+.suporte-form .form-group select:focus,
+.suporte-form .form-group textarea:focus {
+    outline: none;
+    border-color: #071d49;
+    box-shadow: 0 0 0 3px rgba(7, 29, 73, 0.1);
+}
+
+.suporte-form .form-group textarea {
+    resize: vertical;
+    min-height: 120px;
 }
 
 /* Responsive */
@@ -830,148 +993,4 @@ body {
     .upload-area {
         padding: 30px 20px;
     }
-}
-
-/* Estilos personalizados para o Flatpickr */
-.flatpickr-calendar {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
-    border: none;
-}
-
-.flatpickr-calendar.open {
-    z-index: 9999;
-}
-
-.flatpickr-day.selected {
-    background: #2196F3;
-    border-color: #2196F3;
-}
-
-.flatpickr-day.selected:hover {
-    background: #1976D2;
-    border-color: #1976D2;
-}
-
-.flatpickr-day:hover {
-    background: #e3f2fd;
-    border-color: #e3f2fd;
-}
-
-.flatpickr-day.today {
-    border-color: #2196F3;
-    color: #2196F3;
-}
-
-.flatpickr-day.today:hover {
-    background: #e3f2fd;
-    border-color: #2196F3;
-}
-
-.flatpickr-months .flatpickr-month {
-    background: #2196F3;
-    color: white;
-}
-
-.flatpickr-current-month .flatpickr-monthDropdown-months {
-    background: #2196F3;
-    color: white;
-}
-
-.flatpickr-current-month input.cur-year {
-    background: #2196F3;
-    color: white;
-}
-
-.flatpickr-weekdays {
-    background: #f5f5f5;
-}
-
-/* Ícone de calendário nos campos de data */
-.form-group input[type="text"][id*="data"] {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 16px;
-    padding-right: 40px;
-    cursor: pointer;
-}
-
-.form-group input[type="text"][id*="data"]:focus {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%232196F3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
-}
-
-/* Melhorar a aparência quando o Flatpickr está ativo */
-.form-group input.flatpickr-input {
-    position: relative;
-}
-
-.form-group input.flatpickr-input:hover {
-    border-color: #2196F3;
-}/* 
-Estilos para feedback visual de validação de data */
-.form-group input[type="text"][id*="data"].invalid {
-    border-color: #f44336 !important;
-    background-color: #ffebee !important;
-}
-
-.form-group input[type="text"][id*="data"].valid {
-    border-color: #4caf50 !important;
-    background-color: #e8f5e9 !important;
-}
-
-/* Tooltip para dicas de formato de data */
-.form-group input[type="text"][id*="data"]:focus::after {
-    content: "Formato: dd/mm/aaaa";
-    position: absolute;
-    bottom: -25px;
-    left: 0;
-    font-size: 12px;
-    color: #666;
-    background: #fff;
-    padding: 2px 6px;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 1000;
-}
-
-/* Melhorar a aparência dos campos de data */
-.form-group input[type="text"][id*="data"] {
-    transition: all 0.3s ease;
-}
-
-.form-group input[type="text"][id*="data"]:focus {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(33, 150, 243, 0.2);
-}/* Melhora
-r a aparência do campo de data de nascimento com dupla funcionalidade */
-.form-group input[type="text"]#dataNascimento {
-    position: relative;
-}
-
-.form-group input[type="text"]#dataNascimento:hover {
-    border-color: #2196F3;
-    cursor: pointer;
-}
-
-.form-group input[type="text"]#dataNascimento:focus {
-    border-color: #2196F3;
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-/* Indicador visual de que o campo tem calendário */
-.form-group input[type="text"]#dataNascimento::after {
-    content: "📅 Clique para calendário ou digite diretamente";
-    position: absolute;
-    bottom: -20px;
-    left: 0;
-    font-size: 11px;
-    color: #666;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.form-group input[type="text"]#dataNascimento:focus::after {
-    opacity: 1;
 }

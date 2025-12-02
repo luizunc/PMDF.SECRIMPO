@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../styles/panel.css">
     <link rel="stylesheet" href="../styles/loading.css">
     <link rel="stylesheet" href="../styles/custom-alert.css">
-    <link rel="stylesheet" href="../../node_modules/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="../styles/autocomplete.css">
 </head>
 <body>
     <div class="app-container">
@@ -36,9 +36,28 @@
                             <svg class="dropdown-user-icon" viewBox="0 0 24 24" fill="currentColor">
                                 <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" fill="none"/>
                                 <circle cx="12" cy="9" r="3.5" fill="currentColor"/>
+                                <path d="M4 20.5c0-4.5 3.5-7.5 8-7.5s8 3 8 7.5" fill="currentColor"/>
                             </svg>
                             <span class="user-info" id="userInfo">Usuário conectado</span>
                         </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="checkUpdatesBtn">
+                            <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span>Verificar Atualizações</span>
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="suporteBtn">
+                            <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                <line x1="9" y1="10" x2="15" y2="10"/>
+                                <line x1="9" y1="14" x2="15" y2="14"/>
+                            </svg>
+                            <span>Suporte</span>
+                        </button>
                         <div class="dropdown-divider"></div>
                         <button class="dropdown-item" id="logoutBtn">
                             <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -197,15 +216,21 @@
                         </div>
                         <div class="form-group">
                             <label for="leiInfrigida">Lei Infringida</label>
-                            <select id="leiInfrigida" name="leiInfrigida" required>
-                                <option value="">Selecione...</option>
-                                <option value="LCP">LCP</option>
-                                <option value="CP">CP</option>
-                            </select>
+                            <input type="text" id="leiInfrigida" name="leiInfrigida" required>
                         </div>
                         <div class="form-group">
                             <label for="artigo">Artigo</label>
                             <input type="text" id="artigo" name="artigo" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status" name="status" required>
+                                <option value="">Selecione primeiro a espécie...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="numeroPje">Nº PJE</label>
+                            <input type="text" id="numeroPje" name="numeroPje">
                         </div>
                     </div>
                 </section>
@@ -218,28 +243,21 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="especie">Espécie</label>
-                            <input type="text" id="especie" name="especie" required>
+                            <select id="especie" name="especie" required>
+                                <option value="">Selecione...</option>
+                                <option value="SUBSTÂNCIA">SUBSTÂNCIA</option>
+                                <option value="OBJETO">OBJETO</option>
+                                <option value="SIMULACRO">SIMULACRO</option>
+                                <option value="ARMA BRANCA">ARMA BRANCA</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="item">Item</label>
                             <input type="text" id="item" name="item" required>
                         </div>
-                        <div class="form-group-inline">
-                            <div class="form-group form-group-small">
-                                <label for="quantidade">Quantidade</label>
-                                <input type="text" id="quantidade" name="quantidade" required>
-                            </div>
-                            <div class="form-group form-group-small">
-                                <label for="unidadeMedida">Unidade</label>
-                                <select id="unidadeMedida" name="unidadeMedida" required>
-                                    <option value="">Selecione...</option>
-                                    <option value="mg">Mg (Miligrama)</option>
-                                    <option value="g">G (Grama)</option>
-                                    <option value="kg">Kg (Quilograma)</option>
-                                    <option value="t">T (Tonelada)</option>
-                                    <option value="N/A">N/A</option>
-                                </select>
-                            </div>
+                        <div class="form-group">
+                            <label for="quantidade">Quantidade</label>
+                            <input type="text" id="quantidade" name="quantidade" required>
                         </div>
                         <div class="form-group full-width">
                             <label for="descricaoItem">Descrição</label>
@@ -257,10 +275,6 @@
                         <div class="form-group">
                             <label for="nomeProprietario">Nome Completo</label>
                             <input type="text" id="nomeProprietario" name="nomeProprietario" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="dataNascimento">Data de Nascimento</label>
-                            <input type="text" id="dataNascimento" name="dataNascimento" placeholder="dd/mm/aaaa" maxlength="10" required>
                         </div>
                         <div class="form-group">
                             <label for="tipoDocumento">Tipo de Documento</label>
@@ -343,9 +357,63 @@
         </div>
     </div>
 
-    <script src="../../node_modules/flatpickr/dist/flatpickr.min.js"></script>
-    <script src="../../node_modules/flatpickr/dist/l10n/pt.js"></script>
+    <!-- Modal de Suporte -->
+    <div class="modal" id="suporteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Solicitar Suporte</h2>
+                <button class="modal-close" id="suporteModalClose">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="suporteForm" class="suporte-form">
+                    <div class="form-group">
+                        <label for="suporteNome">Nome *</label>
+                        <input type="text" id="suporteNome" name="nome" required placeholder="Digite seu nome completo">
+                    </div>
+                    <div class="form-group">
+                        <label for="suporteUnidade">Unidade *</label>
+                        <select id="suporteUnidade" name="unidade" required>
+                            <option value="">Selecione...</option>
+                            <option value="8º BPM">8º BPM</option>
+                            <option value="10º BPM">10º BPM</option>
+                            <option value="16º BPM">16º BPM</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="suportePrioridade">Prioridade *</label>
+                        <select id="suportePrioridade" name="prioridade" required>
+                            <option value="">Selecione...</option>
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média">Média</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Urgente">Urgente</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="suporteProblema">Problema *</label>
+                        <input type="text" id="suporteProblema" name="problema" required placeholder="Descreva brevemente o problema">
+                    </div>
+                    <div class="form-group">
+                        <label for="suporteDescricao">Descrição do Problema *</label>
+                        <textarea id="suporteDescricao" name="descricao" rows="5" required placeholder="Descreva detalhadamente o problema encontrado"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="suporteCancelBtn">Cancelar</button>
+                <button class="btn-primary" id="suporteSubmitBtn">Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../scripts/custom-alert.js"></script>
+    <script src="../scripts/leisBrasileiras.js"></script>
+    <script src="../scripts/autocomplete.js"></script>
     <script src="../scripts/panel.js"></script>
 </body>
 </html>
